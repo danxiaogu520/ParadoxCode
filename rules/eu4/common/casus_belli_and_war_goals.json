@@ -20,7 +20,7 @@
         },
         "attacker_disabled_po": {
           "card": "0..1",
-          "list": "ref<peace_treaty> | enum<peace_options>",
+          "list": "alias<treaty>",
           "override": true
         },
         "call_empire_members": {
@@ -114,7 +114,7 @@
       }
     },
     "casus_belli_body__attacker_disabled_po": {
-      "items": "ref<peace_treaty> | enum<peace_options>"
+      "items": "alias<treaty>"
     },
     "casus_belli_type_body": {
       "fields": {
@@ -227,7 +227,7 @@
         },
         "peace_options": {
           "card": "0..1",
-          "list": "ref<peace_treaty> | enum<peace_options>"
+          "list": "alias<treaty>"
         },
         "prestige_factor": {
           "card": "0..1",
@@ -240,7 +240,7 @@
         },
         "required_treaty_to_take_provinces": {
           "card": "0..1",
-          "list": "ref<peace_treaty> | enum<peace_options>"
+          "list": "alias<treaty>"
         },
         "transfer_trade_cost_factor": {
           "card": "0..1",
@@ -250,10 +250,10 @@
       }
     },
     "wargoal_type_body__attacker__peace_options": {
-      "items": "ref<peace_treaty> | enum<peace_options>"
+      "items": "alias<treaty>"
     },
     "wargoal_type_body__attacker__required_treaty_to_take_provinces": {
-      "items": "ref<peace_treaty> | enum<peace_options>"
+      "items": "alias<treaty>"
     },
     "wargoal_type_body__defender": {
       "fields": {
@@ -315,7 +315,7 @@
         "peace_options": {
           "card": "0..1",
           "doc": "If po_demand_provinces is on for attacker it also needs to be on for defender",
-          "list": "ref<peace_treaty> | enum<peace_options>"
+          "list": "alias<treaty>"
         },
         "prestige_factor": {
           "card": "0..1",
@@ -328,7 +328,7 @@
         },
         "required_treaty_to_take_provinces": {
           "card": "0..1",
-          "list": "ref<peace_treaty> | enum<peace_options>"
+          "list": "alias<treaty>"
         },
         "transfer_trade_cost_factor": {
           "card": "0..1",
@@ -338,10 +338,10 @@
       }
     },
     "wargoal_type_body__defender__peace_options": {
-      "items": "ref<peace_treaty> | enum<peace_options>"
+      "items": "alias<treaty>"
     },
     "wargoal_type_body__defender__required_treaty_to_take_provinces": {
-      "items": "ref<peace_treaty> | enum<peace_options>"
+      "items": "alias<treaty>"
     },
     "wargoal_type_type_body": {
       "fields": {

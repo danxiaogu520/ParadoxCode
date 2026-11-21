@@ -251,6 +251,45 @@ fn semantic_hover_groups_value_types_by_scope() {
 }
 
 #[test]
+fn semantic_hover_keeps_alias_names_alongside_direct_value_types() {
+    let mut host = fixture_host(serde_json::json!({
+        "aliases": {"word": "'first' | 'second'", "choice": "alias<word> | bool"},
+        "schemas": {"trigger": {"fields": {
+            "grouped": {"value": "alias<choice>", "card": "0..1"},
+            "mixed": {"value": "float | alias<choice>", "card": "0..1"}
+        }}}
+    }));
+    let id = DocumentId::new("file:///tmp/alias_hover.txt");
+    let text = "trigger = { grouped = first mixed = invalid }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open alias fixture");
+    let snapshot = host.snapshot();
+    let grouped = hover(&snapshot, &id, (text.find("grouped").unwrap() + 1) as u32).unwrap();
+    assert!(
+        grouped.contents.contains("| Any | `choice` |"),
+        "{}",
+        grouped.contents
+    );
+    assert!(
+        !grouped.contents.contains("`first`"),
+        "{}",
+        grouped.contents
+    );
+
+    let invalid = hover(&snapshot, &id, (text.find("invalid").unwrap() + 1) as u32).unwrap();
+    assert!(
+        invalid.contents.contains("| Any | `choice` · number |"),
+        "{}",
+        invalid.contents
+    );
+    assert!(
+        invalid.contents.contains("**Invalid value.** `invalid`"),
+        "{}",
+        invalid.contents
+    );
+}
+
+#[test]
 fn semantic_hover_keeps_scope_specific_alternatives_on_the_key() {
     let mut host = eu4_host(game::eu4::runtime_rules().expect("load first-party rules"));
     let id = DocumentId::new("file:///tmp/events/add_claim_hover.txt");
@@ -263,8 +302,8 @@ fn semantic_hover_keeps_scope_specific_alternatives_on_the_key() {
 
     assert!(
         hover.contents.contains(concat!(
-            "| `country` | `province_id` · `province` scope |\n",
-            "| `province` | `country_tag` · `country` scope |"
+            "| `country` | `province` |\n",
+            "| `province` | `country` |"
         )),
         "{}",
         hover.contents
@@ -296,7 +335,7 @@ fn semantic_hover_combines_shared_scopes_and_alternative_shapes() {
         "{religion}"
     );
     assert!(
-        religion.contains("| `province` | `country_tag` |"),
+        religion.contains("| `province` | `country` |"),
         "{religion}"
     );
 

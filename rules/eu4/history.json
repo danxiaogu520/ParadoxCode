@@ -68,7 +68,7 @@
               "country"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | ref<country_tag> | scope<province> | ref<province_id>"
+          "value": "alias<culture>"
         },
         "add_accepted_culture_or_dip_power": {
           "body": "effect__add_accepted_culture_or_dip_power",
@@ -277,7 +277,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           },
           {
             "card": "0..*",
@@ -287,7 +287,7 @@
                 "country"
               ]
             },
-            "value": "scope<province> | ref<province_id>"
+            "value": "alias<province>"
           }
         ],
         "add_colonysize": {
@@ -329,7 +329,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           },
           {
             "card": "0..*",
@@ -339,7 +339,7 @@
                 "country"
               ]
             },
-            "value": "scope<province> | ref<province_id>"
+            "value": "alias<province>"
           }
         ],
         "add_core_construction": [
@@ -661,7 +661,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "add_historical_rival": {
           "card": "0..*",
@@ -671,7 +671,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "add_horde_unity": {
           "card": "0..*",
@@ -781,7 +781,7 @@
               "country"
             ]
           },
-          "value": "float | scope<country> | ref<country_tag>"
+          "value": "float | alias<country>"
         },
         "add_liberty_desire": {
           "card": "0..*",
@@ -1012,7 +1012,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           },
           {
             "card": "0..*",
@@ -1022,7 +1022,7 @@
                 "country"
               ]
             },
-            "value": "scope<province> | ref<province_id>"
+            "value": "alias<province>"
           }
         ],
         "add_permanent_province_modifier": {
@@ -1192,7 +1192,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "add_ruler_modifier": {
           "body": "effect__add_ruler_modifier",
@@ -1363,7 +1363,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           },
           {
             "card": "0..*",
@@ -1373,7 +1373,7 @@
                 "country"
               ]
             },
-            "value": "scope<province> | ref<province_id>"
+            "value": "alias<province>"
           }
         ],
         "add_to_trade_company": {
@@ -1384,7 +1384,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag> | '---'"
+          "value": "alias<country> | '---'"
         },
         "add_trade_company_investment": {
           "body": "effect__add_trade_company_investment",
@@ -1434,7 +1434,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "add_trust": {
           "body": "effect__add_trust",
@@ -1591,7 +1591,7 @@
               "country"
             ]
           },
-          "value": "scope<any> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "allow_federation_offensive_wars": {
           "card": "0..*",
@@ -1643,7 +1643,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -1653,7 +1653,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "back_current_issue": {
@@ -1674,7 +1674,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "banner_infantry": {
           "card": "0..*",
@@ -1684,7 +1684,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "break_alliance": {
           "card": "0..*",
@@ -1694,7 +1694,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "break_marriage": {
           "card": "0..*",
@@ -1704,7 +1704,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "break_union": {
           "card": "0..*",
@@ -1714,7 +1714,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "build_to_forcelimit": {
           "body": "effect__build_to_forcelimit",
@@ -1759,7 +1759,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "carolean_infantry": {
           "card": "0..*",
@@ -1769,7 +1769,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "cavalry": [
           {
@@ -1780,7 +1780,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -1790,7 +1790,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "cawa_infantry": {
@@ -1811,7 +1811,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag> | 'previous_owner' | '---'"
+          "value": "alias<country> | 'previous_owner' | '---'"
         },
         "center_of_trade": {
           "card": "0..*",
@@ -1851,7 +1851,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "change_country_color": {
           "body": "effect__change_country_color",
@@ -1881,7 +1881,7 @@
               "province"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | ref<country_tag> | scope<country> | ref<province_id> | scope<province>"
+          "value": "alias<culture>"
         },
         "change_dip": {
           "card": "0..*",
@@ -2041,7 +2041,7 @@
               "province"
             ]
           },
-          "value": "'FROM' | ref<culture> | enum<culture_new_variables> | ref<country_tag> | scope<country> | ref<province_id> | scope<province>"
+          "value": "'FROM' | alias<culture>"
         },
         "change_personal_deity": {
           "card": "0..*",
@@ -2066,7 +2066,7 @@
               "country"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | ref<country_tag> | scope<province> | ref<province_id>"
+          "value": "alias<culture>"
         },
         "change_province_name": {
           "card": "0..*",
@@ -2088,7 +2088,7 @@
                 "province"
               ]
             },
-            "value": "ref<religion> | enum<religion_new_variables> | 'heretic' | scope<country> | scope<province> | ref<province_id>"
+            "value": "ref<religion> | enum<religion_new_variables> | 'heretic' | scope<country> | alias<province>"
           },
           {
             "card": "0..*",
@@ -2149,7 +2149,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "change_technology_group": {
           "card": "0..*",
@@ -2413,7 +2413,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "cossack_infantry": {
           "card": "0..*",
@@ -2423,7 +2423,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "country_event": {
           "body": "effect__country_event",
@@ -2464,7 +2464,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "create_colony": {
           "card": "0..*",
@@ -2524,7 +2524,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "create_independent_estate": {
           "body": "effect__create_independent_estate",
@@ -2554,7 +2554,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "create_marriage": {
           "card": "0..*",
@@ -2564,7 +2564,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "create_named_ship": {
           "body": "effect__create_named_ship",
@@ -2632,7 +2632,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "create_unit_forcelimit_percentage": {
           "body": "effect__create_unit_forcelimit_percentage",
@@ -2652,7 +2652,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "custom_tooltip": {
           "card": "0..*",
@@ -2667,7 +2667,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "declare_war_with_cb": {
           "body": "effect__declare_war_with_cb",
@@ -2903,7 +2903,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "discover_province": {
           "card": "0..*",
@@ -2913,7 +2913,7 @@
               "country"
             ]
           },
-          "value": "scope<province> | ref<province_id>"
+          "value": "alias<province>"
         },
         "discover_provinces": {
           "card": "0..*",
@@ -2923,7 +2923,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "dismantle_empire_of_china": {
           "card": "0..*",
@@ -3375,7 +3375,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "exile_consort_as": {
           "card": "0..*",
@@ -3485,7 +3485,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "force_remove_rival": {
           "card": "0..*",
@@ -3495,7 +3495,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "form_coalition_against": {
           "card": "0..*",
@@ -3505,7 +3505,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "form_federation_nation": {
           "body": "effect__form_federation_nation",
@@ -3525,7 +3525,7 @@
               "country"
             ]
           },
-          "value": "scope<any> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "freeze_government_power": {
           "body": "effect__freeze_government_power",
@@ -3545,7 +3545,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "galleon_heavy": {
           "card": "0..*",
@@ -3555,7 +3555,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "galley": [
           {
@@ -3566,7 +3566,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -3576,7 +3576,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "generate_estate_agenda": {
@@ -3597,7 +3597,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "government": {
           "card": "0..1",
@@ -3639,7 +3639,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -3649,7 +3649,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "hidden_effect": {
@@ -3718,7 +3718,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "if": {
           "body": "effect__if",
@@ -3752,7 +3752,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -3762,7 +3762,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "inherit": {
@@ -3773,7 +3773,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "internal_hre_cb": {
           "card": "0..*",
@@ -3793,7 +3793,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "join_all_defensive_wars_of": {
           "card": "0..*",
@@ -3803,7 +3803,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "join_all_offensive_wars_of": {
           "card": "0..*",
@@ -3813,7 +3813,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "join_league": {
           "card": "0..*",
@@ -3937,7 +3937,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -3947,7 +3947,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "limit": {
@@ -3992,7 +3992,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "mamluks_infantry": {
           "card": "0..*",
@@ -4002,7 +4002,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "man_of_war_heavy": {
           "card": "0..*",
@@ -4012,7 +4012,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "man_of_war_light": {
           "card": "0..*",
@@ -4022,7 +4022,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "marine_infantry": {
           "card": "0..*",
@@ -4032,7 +4032,7 @@
               "province"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "mercantilism": {
           "card": "0..1",
@@ -4048,7 +4048,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -4058,7 +4058,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "mercenary_infantry": [
@@ -4070,7 +4070,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -4080,7 +4080,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "mil_power_cost": {
@@ -4130,7 +4130,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "national_focus": {
           "card": "0..1",
@@ -4196,7 +4196,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "qizilbash_infantry": {
           "card": "0..*",
@@ -4206,7 +4206,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "raise_war_taxes": {
           "card": "0..*",
@@ -4226,7 +4226,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "random": {
           "body": "effect__random",
@@ -4567,7 +4567,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "regenerate_government_mechanics": {
           "card": "0..*",
@@ -4608,7 +4608,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "release_all_possible_countries": {
           "card": "0..*",
@@ -4647,7 +4647,7 @@
               "country"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | ref<country_tag> | scope<province> | ref<province_id>"
+          "value": "alias<culture>"
         },
         "remove_active_fervor": {
           "card": "0..*",
@@ -4766,7 +4766,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           },
           {
             "card": "0..*",
@@ -4776,7 +4776,7 @@
                 "country"
               ]
             },
-            "value": "scope<province> | ref<province_id>"
+            "value": "alias<province>"
           }
         ],
         "remove_consort": {
@@ -4798,7 +4798,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           },
           {
             "card": "0..*",
@@ -4808,7 +4808,7 @@
                 "country"
               ]
             },
-            "value": "scope<province> | ref<province_id>"
+            "value": "alias<province>"
           }
         ],
         "remove_country": {
@@ -4829,7 +4829,7 @@
               "country"
             ]
           },
-          "value": "ref<event_modifier> | ref<static_modifier>"
+          "value": "alias<modifier>"
         },
         "remove_defender_of_the_faith": {
           "card": "0..*",
@@ -4899,7 +4899,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "remove_hegemon": {
           "card": "0..*",
@@ -4909,7 +4909,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "remove_heir": {
           "body": "effect__remove_heir",
@@ -4951,7 +4951,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "remove_historical_rival": {
           "card": "0..*",
@@ -4961,7 +4961,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "remove_idea": {
           "card": "0..*",
@@ -5041,7 +5041,7 @@
               "province"
             ]
           },
-          "value": "ref<event_modifier> | ref<province_triggered_modifier> | ref<static_modifier>"
+          "value": "alias<modifier> | ref<province_triggered_modifier>"
         },
         "remove_province_triggered_modifier": {
           "card": "0..*",
@@ -5103,7 +5103,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "remove_ruler_personality": [
           {
@@ -5136,7 +5136,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           },
           {
             "card": "0..*",
@@ -5146,7 +5146,7 @@
                 "country"
               ]
             },
-            "value": "scope<province> | ref<province_id>"
+            "value": "alias<province>"
           }
         ],
         "remove_trade_modifier": {
@@ -5267,7 +5267,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "revolutionary_guard_cavalry": {
           "card": "0..*",
@@ -5277,7 +5277,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "revolutionary_guard_infantry": {
           "card": "0..*",
@@ -5287,7 +5287,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "round_variable": {
           "body": "effect__round_variable",
@@ -5302,7 +5302,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "save_event_target_as": {
           "card": "0..*",
@@ -5381,7 +5381,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "set_base_manpower": {
           "card": "0..*",
@@ -5421,7 +5421,7 @@
               "country"
             ]
           },
-          "value": "scope<province> | ref<province_id>"
+          "value": "alias<province>"
         },
         "set_consort": {
           "card": "0..*",
@@ -5442,7 +5442,7 @@
               "country"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | scope<province> | ref<province_id> | ref<country_tag>"
+          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | alias<province> | ref<country_tag>"
         },
         "set_consort_flag": {
           "card": "0..*",
@@ -5462,7 +5462,7 @@
               "country"
             ]
           },
-          "value": "ref<religion> | enum<religion_new_variables> | scope<country> | ref<country_tag> | scope<province> | ref<province_id>"
+          "value": "alias<religion>"
         },
         "set_country_flag": {
           "card": "0..*",
@@ -5492,7 +5492,7 @@
               "country"
             ]
           },
-          "value": "ref<dynasty_name> | scope<country> | ref<country_tag> | 'original_dynasty'"
+          "value": "ref<dynasty_name> | alias<country> | 'original_dynasty'"
         },
         "set_emperor": {
           "card": "0..*",
@@ -5512,7 +5512,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "set_estate_led_regency_privilege": {
           "card": "0..*",
@@ -5608,7 +5608,7 @@
               "country"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | ref<province_id> | scope<province> | ref<country_tag>"
+          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | alias<province> | ref<country_tag>"
         },
         "set_heir_flag": {
           "card": "0..*",
@@ -5628,7 +5628,7 @@
               "country"
             ]
           },
-          "value": "ref<religion> | enum<religion_new_variables> | scope<country> | ref<country_tag> | scope<province> | ref<province_id>"
+          "value": "alias<religion>"
         },
         "set_hre_heretic_religion": {
           "card": "0..*",
@@ -5684,7 +5684,7 @@
               "province"
             ]
           },
-          "value": "'yes' | bool"
+          "value": "bool"
         },
         "set_incident_variable_value": {
           "body": "effect__set_incident_variable_value",
@@ -5781,7 +5781,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "set_permanent_province_flag": {
           "card": "0..*",
@@ -5851,7 +5851,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag> | '---'"
+          "value": "alias<country> | '---'"
         },
         "set_ruler": {
           "card": "0..*",
@@ -5871,7 +5871,7 @@
               "country"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | ref<country_tag> | ref<province_id> | scope<province>"
+          "value": "alias<culture>"
         },
         "set_ruler_flag": {
           "card": "0..*",
@@ -5891,7 +5891,7 @@
               "country"
             ]
           },
-          "value": "ref<religion> | enum<religion_new_variables> | scope<country> | ref<country_tag> | scope<province> | ref<province_id>"
+          "value": "alias<religion>"
         },
         "set_saved_name": {
           "body": "effect__set_saved_name",
@@ -5945,7 +5945,7 @@
               "province"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "show_ambient_object": {
           "card": "0..*",
@@ -5960,7 +5960,7 @@
               "province"
             ]
           },
-          "value": "scope<province> | ref<province_id>"
+          "value": "alias<province>"
         },
         "spawn_rebels": {
           "body": "effect__spawn_rebels",
@@ -6005,7 +6005,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "streltsy_infantry": {
           "card": "0..*",
@@ -6015,7 +6015,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "subtract_variable": {
           "body": "effect__subtract_variable",
@@ -6029,7 +6029,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "swap_free_idea_group": {
           "card": "0..*",
@@ -6059,7 +6059,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "technology_group": {
           "card": "0..1",
@@ -6074,7 +6074,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "this": {
           "body": "self",
@@ -6109,7 +6109,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -6119,7 +6119,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "trigger_switch": {
@@ -6140,7 +6140,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "undiscover_province": {
           "card": "0..*",
@@ -6150,7 +6150,7 @@
               "country"
             ]
           },
-          "value": "scope<province> | ref<province_id>"
+          "value": "alias<province>"
         },
         "unfreeze_government_power": {
           "body": "effect__unfreeze_government_power",
@@ -6205,7 +6205,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "voc_indiamen_light": {
           "card": "0..*",
@@ -6215,7 +6215,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "while": {
           "body": "effect__while",
@@ -6230,7 +6230,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         }
       },
       "patterns": [
@@ -6512,7 +6512,7 @@
           "card": "0..*",
           "doc": "In country scope, spawns a specific unit (e.g. \"british_redcoat\") for the current scope in the defined province scope. In province scope, spawns a specific unit in the current province scope for the defined country scope. Units can be found in /Europa Universalis IV/common/units/*.txt.",
           "key": "ref<unit_type>",
-          "value": "scope<province> | ref<province_id> | scope<country> | ref<country_tag>"
+          "value": "alias<province> | alias<country>"
         },
         {
           "body": "effect",
@@ -7106,7 +7106,7 @@
               "country"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | ref<country_tag> | scope<province> | ref<province_id>"
+          "value": "alias<culture>"
         },
         "add_accepted_culture_or_dip_power": {
           "body": "effect__add_accepted_culture_or_dip_power",
@@ -7315,7 +7315,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           },
           {
             "card": "0..*",
@@ -7325,7 +7325,7 @@
                 "country"
               ]
             },
-            "value": "scope<province> | ref<province_id>"
+            "value": "alias<province>"
           }
         ],
         "add_colonysize": {
@@ -7687,7 +7687,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "add_historical_rival": {
           "card": "0..*",
@@ -7697,7 +7697,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "add_horde_unity": {
           "card": "0..*",
@@ -7807,7 +7807,7 @@
               "country"
             ]
           },
-          "value": "float | scope<country> | ref<country_tag>"
+          "value": "float | alias<country>"
         },
         "add_liberty_desire": {
           "card": "0..*",
@@ -8038,7 +8038,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           },
           {
             "card": "0..*",
@@ -8048,7 +8048,7 @@
                 "country"
               ]
             },
-            "value": "scope<province> | ref<province_id>"
+            "value": "alias<province>"
           }
         ],
         "add_permanent_province_modifier": {
@@ -8218,7 +8218,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "add_ruler_modifier": {
           "body": "effect__add_ruler_modifier",
@@ -8389,7 +8389,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           },
           {
             "card": "0..*",
@@ -8399,7 +8399,7 @@
                 "country"
               ]
             },
-            "value": "scope<province> | ref<province_id>"
+            "value": "alias<province>"
           }
         ],
         "add_to_trade_company": {
@@ -8410,7 +8410,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag> | '---'"
+          "value": "alias<country> | '---'"
         },
         "add_trade_company_investment": {
           "body": "effect__add_trade_company_investment",
@@ -8460,7 +8460,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "add_trust": {
           "body": "effect__add_trust",
@@ -8617,7 +8617,7 @@
               "country"
             ]
           },
-          "value": "scope<any> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "allow_federation_offensive_wars": {
           "card": "0..*",
@@ -8669,7 +8669,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -8679,7 +8679,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "back_current_issue": {
@@ -8700,7 +8700,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "banner_infantry": {
           "card": "0..*",
@@ -8710,7 +8710,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "base_manpower": {
           "card": "0..1",
@@ -8735,7 +8735,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "break_marriage": {
           "card": "0..*",
@@ -8745,7 +8745,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "break_union": {
           "card": "0..*",
@@ -8755,7 +8755,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "build_to_forcelimit": {
           "body": "effect__build_to_forcelimit",
@@ -8800,7 +8800,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "carolean_infantry": {
           "card": "0..*",
@@ -8810,7 +8810,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "cavalry": [
           {
@@ -8821,7 +8821,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -8831,7 +8831,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "cawa_infantry": {
@@ -8852,7 +8852,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag> | 'previous_owner' | '---'"
+          "value": "alias<country> | 'previous_owner' | '---'"
         },
         "center_of_trade": {
           "card": "0..*",
@@ -8886,7 +8886,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "change_country_color": {
           "body": "effect__change_country_color",
@@ -8916,7 +8916,7 @@
               "province"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | ref<country_tag> | scope<country> | ref<province_id> | scope<province>"
+          "value": "alias<culture>"
         },
         "change_dip": {
           "card": "0..*",
@@ -9076,7 +9076,7 @@
               "province"
             ]
           },
-          "value": "'FROM' | ref<culture> | enum<culture_new_variables> | ref<country_tag> | scope<country> | ref<province_id> | scope<province>"
+          "value": "'FROM' | alias<culture>"
         },
         "change_personal_deity": {
           "card": "0..*",
@@ -9101,7 +9101,7 @@
               "country"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | ref<country_tag> | scope<province> | ref<province_id>"
+          "value": "alias<culture>"
         },
         "change_province_name": {
           "card": "0..*",
@@ -9123,7 +9123,7 @@
                 "province"
               ]
             },
-            "value": "ref<religion> | enum<religion_new_variables> | 'heretic' | scope<country> | scope<province> | ref<province_id>"
+            "value": "ref<religion> | enum<religion_new_variables> | 'heretic' | scope<country> | alias<province>"
           },
           {
             "card": "0..*",
@@ -9184,7 +9184,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "change_technology_group": {
           "card": "0..*",
@@ -9453,7 +9453,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "cossack_infantry": {
           "card": "0..*",
@@ -9463,7 +9463,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "country_event": {
           "body": "effect__country_event",
@@ -9504,7 +9504,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "create_colony": {
           "card": "0..*",
@@ -9564,7 +9564,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "create_independent_estate": {
           "body": "effect__create_independent_estate",
@@ -9594,7 +9594,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "create_marriage": {
           "card": "0..*",
@@ -9604,7 +9604,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "create_named_ship": {
           "body": "effect__create_named_ship",
@@ -9672,7 +9672,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "create_unit_forcelimit_percentage": {
           "body": "effect__create_unit_forcelimit_percentage",
@@ -9692,7 +9692,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "culture": {
           "card": "0..1",
@@ -9712,7 +9712,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "declare_war_with_cb": {
           "body": "effect__declare_war_with_cb",
@@ -9948,7 +9948,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "discover_province": {
           "card": "0..*",
@@ -9958,7 +9958,7 @@
               "country"
             ]
           },
-          "value": "scope<province> | ref<province_id>"
+          "value": "alias<province>"
         },
         "discover_provinces": {
           "card": "0..*",
@@ -9968,7 +9968,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "discovered_by": {
           "card": "0..*",
@@ -10436,7 +10436,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "exile_consort_as": {
           "card": "0..*",
@@ -10540,7 +10540,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "force_remove_rival": {
           "card": "0..*",
@@ -10550,7 +10550,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "form_coalition_against": {
           "card": "0..*",
@@ -10560,7 +10560,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "form_federation_nation": {
           "body": "effect__form_federation_nation",
@@ -10580,7 +10580,7 @@
               "country"
             ]
           },
-          "value": "scope<any> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "freeze_government_power": {
           "body": "effect__freeze_government_power",
@@ -10600,7 +10600,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "galleon_heavy": {
           "card": "0..*",
@@ -10610,7 +10610,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "galley": [
           {
@@ -10621,7 +10621,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -10631,7 +10631,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "generate_estate_agenda": {
@@ -10652,7 +10652,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "grant_independence": [
           {
@@ -10685,7 +10685,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -10695,7 +10695,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "hidden_effect": {
@@ -10754,7 +10754,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "if": {
           "body": "effect__if",
@@ -10788,7 +10788,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -10798,7 +10798,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "inherit": {
@@ -10809,7 +10809,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "internal_hre_cb": {
           "card": "0..*",
@@ -10834,7 +10834,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "join_all_defensive_wars_of": {
           "card": "0..*",
@@ -10844,7 +10844,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "join_all_offensive_wars_of": {
           "card": "0..*",
@@ -10854,7 +10854,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "join_league": {
           "card": "0..*",
@@ -10983,7 +10983,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -10993,7 +10993,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "limit": {
@@ -11038,7 +11038,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "mamluks_infantry": {
           "card": "0..*",
@@ -11048,7 +11048,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "man_of_war_heavy": {
           "card": "0..*",
@@ -11058,7 +11058,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "man_of_war_light": {
           "card": "0..*",
@@ -11068,7 +11068,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "marine_infantry": {
           "card": "0..*",
@@ -11078,7 +11078,7 @@
               "province"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "mercenary_cavalry": [
           {
@@ -11089,7 +11089,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -11099,7 +11099,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "mercenary_infantry": [
@@ -11111,7 +11111,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -11121,7 +11121,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "mil_power_cost": {
@@ -11171,7 +11171,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "native_ferocity": [
           {
@@ -11270,7 +11270,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "qizilbash_infantry": {
           "card": "0..*",
@@ -11280,7 +11280,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "raise_war_taxes": {
           "card": "0..*",
@@ -11300,7 +11300,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "random": {
           "body": "effect__random",
@@ -11641,7 +11641,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "regenerate_government_mechanics": {
           "card": "0..*",
@@ -11682,7 +11682,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "release_all_possible_countries": {
           "card": "0..*",
@@ -11717,7 +11717,7 @@
               "country"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | ref<country_tag> | scope<province> | ref<province_id>"
+          "value": "alias<culture>"
         },
         "remove_active_fervor": {
           "card": "0..*",
@@ -11836,7 +11836,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           },
           {
             "card": "0..*",
@@ -11846,7 +11846,7 @@
                 "country"
               ]
             },
-            "value": "scope<province> | ref<province_id>"
+            "value": "alias<province>"
           }
         ],
         "remove_consort": {
@@ -11868,7 +11868,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           },
           {
             "card": "0..*",
@@ -11878,7 +11878,7 @@
                 "country"
               ]
             },
-            "value": "scope<province> | ref<province_id>"
+            "value": "alias<province>"
           }
         ],
         "remove_country": {
@@ -11899,7 +11899,7 @@
               "country"
             ]
           },
-          "value": "ref<event_modifier> | ref<static_modifier>"
+          "value": "alias<modifier>"
         },
         "remove_defender_of_the_faith": {
           "card": "0..*",
@@ -11969,7 +11969,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "remove_hegemon": {
           "card": "0..*",
@@ -11979,7 +11979,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "remove_heir": {
           "body": "effect__remove_heir",
@@ -12021,7 +12021,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "remove_historical_rival": {
           "card": "0..*",
@@ -12031,7 +12031,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "remove_idea": {
           "card": "0..*",
@@ -12111,7 +12111,7 @@
               "province"
             ]
           },
-          "value": "ref<event_modifier> | ref<province_triggered_modifier> | ref<static_modifier>"
+          "value": "alias<modifier> | ref<province_triggered_modifier>"
         },
         "remove_province_triggered_modifier": {
           "card": "0..*",
@@ -12173,7 +12173,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "remove_ruler_personality": [
           {
@@ -12206,7 +12206,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           },
           {
             "card": "0..*",
@@ -12216,7 +12216,7 @@
                 "country"
               ]
             },
-            "value": "scope<province> | ref<province_id>"
+            "value": "alias<province>"
           }
         ],
         "remove_trade_modifier": {
@@ -12342,7 +12342,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "revolutionary_guard_cavalry": {
           "card": "0..*",
@@ -12352,7 +12352,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "revolutionary_guard_infantry": {
           "card": "0..*",
@@ -12362,7 +12362,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "round_variable": {
           "body": "effect__round_variable",
@@ -12377,7 +12377,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "save_event_target_as": {
           "card": "0..*",
@@ -12456,7 +12456,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "set_base_manpower": {
           "card": "0..*",
@@ -12496,7 +12496,7 @@
               "country"
             ]
           },
-          "value": "scope<province> | ref<province_id>"
+          "value": "alias<province>"
         },
         "set_consort": {
           "card": "0..*",
@@ -12517,7 +12517,7 @@
               "country"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | scope<province> | ref<province_id> | ref<country_tag>"
+          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | alias<province> | ref<country_tag>"
         },
         "set_consort_flag": {
           "card": "0..*",
@@ -12537,7 +12537,7 @@
               "country"
             ]
           },
-          "value": "ref<religion> | enum<religion_new_variables> | scope<country> | ref<country_tag> | scope<province> | ref<province_id>"
+          "value": "alias<religion>"
         },
         "set_country_flag": {
           "card": "0..*",
@@ -12567,7 +12567,7 @@
               "country"
             ]
           },
-          "value": "ref<dynasty_name> | scope<country> | ref<country_tag> | 'original_dynasty'"
+          "value": "ref<dynasty_name> | alias<country> | 'original_dynasty'"
         },
         "set_emperor": {
           "card": "0..*",
@@ -12587,7 +12587,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "set_estate_led_regency_privilege": {
           "card": "0..*",
@@ -12683,7 +12683,7 @@
               "country"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | ref<province_id> | scope<province> | ref<country_tag>"
+          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | alias<province> | ref<country_tag>"
         },
         "set_heir_flag": {
           "card": "0..*",
@@ -12703,7 +12703,7 @@
               "country"
             ]
           },
-          "value": "ref<religion> | enum<religion_new_variables> | scope<country> | ref<country_tag> | scope<province> | ref<province_id>"
+          "value": "alias<religion>"
         },
         "set_hre_heretic_religion": {
           "card": "0..*",
@@ -12759,7 +12759,7 @@
               "province"
             ]
           },
-          "value": "'yes' | bool"
+          "value": "bool"
         },
         "set_incident_variable_value": {
           "body": "effect__set_incident_variable_value",
@@ -12856,7 +12856,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "set_permanent_province_flag": {
           "card": "0..*",
@@ -12926,7 +12926,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag> | '---'"
+          "value": "alias<country> | '---'"
         },
         "set_ruler": {
           "card": "0..*",
@@ -12946,7 +12946,7 @@
               "country"
             ]
           },
-          "value": "ref<culture> | enum<culture_new_variables> | scope<country> | ref<country_tag> | ref<province_id> | scope<province>"
+          "value": "alias<culture>"
         },
         "set_ruler_flag": {
           "card": "0..*",
@@ -12966,7 +12966,7 @@
               "country"
             ]
           },
-          "value": "ref<religion> | enum<religion_new_variables> | scope<country> | ref<country_tag> | scope<province> | ref<province_id>"
+          "value": "alias<religion>"
         },
         "set_saved_name": {
           "body": "effect__set_saved_name",
@@ -13020,7 +13020,7 @@
               "province"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "show_ambient_object": {
           "card": "0..*",
@@ -13035,7 +13035,7 @@
               "province"
             ]
           },
-          "value": "scope<province> | ref<province_id>"
+          "value": "alias<province>"
         },
         "spawn_rebels": {
           "body": "effect__spawn_rebels",
@@ -13080,7 +13080,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "streltsy_infantry": {
           "card": "0..*",
@@ -13090,7 +13090,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "subtract_variable": {
           "body": "effect__subtract_variable",
@@ -13104,7 +13104,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "swap_free_idea_group": {
           "card": "0..*",
@@ -13134,7 +13134,7 @@
               "country"
             ]
           },
-          "value": "ref<country_tag> | scope<country>"
+          "value": "alias<country>"
         },
         "tercio_infantry": {
           "card": "0..*",
@@ -13144,7 +13144,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "this": {
           "body": "self",
@@ -13183,7 +13183,7 @@
                 "country"
               ]
             },
-            "value": "ref<province_id> | scope<province>"
+            "value": "alias<province>"
           },
           {
             "card": "0..*",
@@ -13193,7 +13193,7 @@
                 "province"
               ]
             },
-            "value": "scope<country> | ref<country_tag>"
+            "value": "alias<country>"
           }
         ],
         "tribal_owner": {
@@ -13219,7 +13219,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "undiscover_province": {
           "card": "0..*",
@@ -13229,7 +13229,7 @@
               "country"
             ]
           },
-          "value": "scope<province> | ref<province_id>"
+          "value": "alias<province>"
         },
         "unfreeze_government_power": {
           "body": "effect__unfreeze_government_power",
@@ -13284,7 +13284,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "voc_indiamen_light": {
           "card": "0..*",
@@ -13294,7 +13294,7 @@
               "province"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         },
         "while": {
           "body": "effect__while",
@@ -13309,7 +13309,7 @@
               "country"
             ]
           },
-          "value": "scope<country> | ref<country_tag>"
+          "value": "alias<country>"
         }
       },
       "patterns": [
@@ -13632,7 +13632,7 @@
           "card": "0..*",
           "doc": "In country scope, spawns a specific unit (e.g. \"british_redcoat\") for the current scope in the defined province scope. In province scope, spawns a specific unit in the current province scope for the defined country scope. Units can be found in /Europa Universalis IV/common/units/*.txt.",
           "key": "ref<unit_type>",
-          "value": "scope<province> | ref<province_id> | scope<country> | ref<country_tag>"
+          "value": "alias<province> | alias<country>"
         },
         {
           "body": "effect",

@@ -35,6 +35,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The language server reads BOM-marked UTF-16 scripts. Workspace formatting preserves the source
   encoding, including Windows-1252 and UTF-8 or UTF-16 byte-order marks.
 
+- EU4 rule hovers show named groups such as `country` or `province` under allowed value types.
+  Country and province arguments are checked against the declared target scope.
+
 ### Fixed
 
 - EU4 government reform hovers show a single reform reference type. Hovers and completions mark

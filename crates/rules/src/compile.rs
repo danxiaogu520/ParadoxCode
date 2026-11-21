@@ -94,7 +94,13 @@ impl fmt::Display for Diagnostic {
 /// returned diagnostics are sorted by `(file, pointer, code)` so runs are
 /// deterministic.
 pub fn check(sources: &[(String, RuleFile)]) -> Vec<Diagnostic> {
-    let mut checker = Checker::new(sources);
+    check_with_aliases(sources).0
+}
+
+pub(crate) fn check_with_aliases(sources: &[(String, RuleFile)]) -> (Vec<Diagnostic>, Aliases) {
+    let mut diagnostics = Vec::new();
+    let aliases = collect_aliases(sources, &mut diagnostics);
+    let mut checker = Checker::new(sources, &aliases, diagnostics);
     checker.collect();
     checker.check_block_forms();
     checker.check_include_conflicts();
@@ -113,7 +119,7 @@ pub fn check(sources: &[(String, RuleFile)]) -> Vec<Diagnostic> {
     {
         checker
             .diagnostics
-            .extend(crate::lower::check_queries(sources));
+            .extend(crate::lower::check_queries(sources, &aliases));
     }
     let Checker {
         mut diagnostics, ..
@@ -126,7 +132,7 @@ pub fn check(sources: &[(String, RuleFile)]) -> Vec<Diagnostic> {
             &right.message,
         ))
     });
-    diagnostics
+    (diagnostics, aliases)
 }
 
 /// One definition's provenance.
@@ -153,6 +159,130 @@ impl At {
 fn join_pointer(base: &str, segment: &str) -> String {
     let escaped = segment.replace('~', "~0").replace('/', "~1");
     format!("{base}/{escaped}")
+}
+
+#[derive(Default)]
+pub(crate) struct Aliases(BTreeMap<String, Option<Expr>>);
+
+pub(crate) enum ExpressionError {
+    Parse(expr::ParseError),
+    UndefinedAlias(String),
+    InvalidAlias,
+}
+
+impl Aliases {
+    pub(crate) fn parse(&self, raw: &str) -> Result<Expr, ExpressionError> {
+        self.expand(expr::parse(raw).map_err(ExpressionError::Parse)?)
+    }
+
+    pub(crate) fn expand(&self, parsed: Expr) -> Result<Expr, ExpressionError> {
+        parsed.expand_aliases(&mut |name| self.resolve(name).cloned())
+    }
+
+    pub(crate) fn resolve(&self, name: &str) -> Result<&Expr, ExpressionError> {
+        match self.0.get(&name.to_ascii_lowercase()) {
+            Some(Some(target)) => Ok(target),
+            Some(None) => Err(ExpressionError::InvalidAlias),
+            None => Err(ExpressionError::UndefinedAlias(name.to_owned())),
+        }
+    }
+}
+
+fn collect_aliases(sources: &[(String, RuleFile)], diagnostics: &mut Vec<Diagnostic>) -> Aliases {
+    let mut pending = BTreeMap::new();
+    for (file, source) in sources {
+        for (name, raw) in &source.aliases {
+            let at = At {
+                file: file.clone(),
+                pointer: join_pointer("/aliases", name),
+            };
+            if !is_ident(name) {
+                report_parse(
+                    diagnostics,
+                    &at,
+                    None,
+                    format!("invalid alias name `{name}`"),
+                );
+                continue;
+            }
+            let name = name.to_ascii_lowercase();
+            match pending.entry(name) {
+                std::collections::btree_map::Entry::Vacant(entry) => {
+                    let parsed = match expr::parse(raw) {
+                        Ok(parsed) => Some(parsed),
+                        Err(failure) => {
+                            report_parse(diagnostics, &at, Some(failure.column), failure.message);
+                            None
+                        }
+                    };
+                    entry.insert((at, parsed));
+                }
+                std::collections::btree_map::Entry::Occupied(entry) => report(
+                    diagnostics,
+                    &at,
+                    DiagnosticCode::DuplicateName,
+                    Severity::Error,
+                    format!("alias `{}` is defined more than once", entry.key()),
+                ),
+            }
+        }
+    }
+
+    let mut aliases = Aliases::default();
+    let mut visiting = BTreeSet::new();
+    while let Some(name) = pending.keys().next().cloned() {
+        resolve_alias(
+            &name,
+            &mut pending,
+            &mut aliases,
+            &mut visiting,
+            diagnostics,
+        );
+    }
+    aliases
+}
+
+fn resolve_alias(
+    name: &str,
+    pending: &mut BTreeMap<String, (At, Option<Expr>)>,
+    aliases: &mut Aliases,
+    visiting: &mut BTreeSet<String>,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<Expr> {
+    if let Some(resolved) = aliases.0.get(name) {
+        return resolved.clone();
+    }
+    let (at, parsed) = pending.remove(name).expect("declared alias");
+    visiting.insert(name.to_owned());
+    let resolved = parsed.and_then(|parsed| {
+        parsed
+            .expand_aliases(&mut |target| {
+                let folded = target.to_ascii_lowercase();
+                if visiting.contains(&folded) {
+                    report_parse(diagnostics, &at, None, format!("cyclic alias `{target}`"));
+                    return Err(());
+                }
+                if !pending.contains_key(&folded) && !aliases.0.contains_key(&folded) {
+                    report_undefined_alias(diagnostics, &at, target);
+                    return Err(());
+                }
+                resolve_alias(&folded, pending, aliases, visiting, diagnostics).ok_or(())
+            })
+            .ok()
+    });
+    visiting.remove(name);
+    aliases.0.insert(name.to_owned(), resolved.clone());
+    resolved
+}
+
+fn report_undefined_alias(diagnostics: &mut Vec<Diagnostic>, at: &At, name: &str) {
+    report(
+        diagnostics,
+        at,
+        DiagnosticCode::UndefinedReference,
+        Severity::Error,
+        format!("alias `{name}` is not defined"),
+    );
 }
 
 /// A schema reference spelled as a `body` string.
@@ -260,6 +390,7 @@ struct QueryUse {
 /// The collected world the checks reason over.
 struct Checker<'a> {
     sources: &'a [(String, RuleFile)],
+    aliases: &'a Aliases,
     diagnostics: Vec<Diagnostic>,
     schemas: BTreeMap<String, SchemaDef<'a>>,
     mixins: BTreeMap<String, Named<'a, MixinSpec>>,
@@ -277,10 +408,15 @@ struct Checker<'a> {
 }
 
 impl<'a> Checker<'a> {
-    fn new(sources: &'a [(String, RuleFile)]) -> Self {
+    fn new(
+        sources: &'a [(String, RuleFile)],
+        aliases: &'a Aliases,
+        diagnostics: Vec<Diagnostic>,
+    ) -> Self {
         Self {
             sources,
-            diagnostics: Vec::new(),
+            aliases,
+            diagnostics,
             schemas: BTreeMap::new(),
             mixins: BTreeMap::new(),
             types: BTreeMap::new(),
@@ -299,7 +435,7 @@ impl<'a> Checker<'a> {
     /// Parses one type expression, recording parse errors (including the
     /// union-shape rule) and collecting parameter uses.
     fn expr(&mut self, at: &At, raw: &str, ctx: &ParamCtx) -> Option<Expr> {
-        match expr::parse(raw) {
+        match self.aliases.parse(raw) {
             Ok(parsed) => {
                 for param in expr_params(&parsed) {
                     self.params.push(ParamUse {
@@ -313,15 +449,25 @@ impl<'a> Checker<'a> {
                 self.collect_queries(at, &parsed, ctx);
                 Some(parsed)
             }
-            Err(failure) => {
-                report_parse(
-                    &mut self.diagnostics,
-                    at,
-                    Some(failure.column),
-                    failure.message,
-                );
+            Err(error) => {
+                self.report_expression_error(at, error);
                 None
             }
+        }
+    }
+
+    fn report_expression_error(&mut self, at: &At, error: ExpressionError) {
+        match error {
+            ExpressionError::Parse(failure) => report_parse(
+                &mut self.diagnostics,
+                at,
+                Some(failure.column),
+                failure.message,
+            ),
+            ExpressionError::UndefinedAlias(name) => {
+                report_undefined_alias(&mut self.diagnostics, at, &name);
+            }
+            ExpressionError::InvalidAlias => {}
         }
     }
 
@@ -707,7 +853,12 @@ impl<'a> Checker<'a> {
                     Ok(parts) => {
                         for part in parts {
                             if let expr::LiteralPart::Hole(hole) = part {
-                                self.collect_queries(&at, &hole, &ParamCtx::closed());
+                                match self.aliases.expand(hole) {
+                                    Ok(parsed) => {
+                                        self.collect_queries(&at, &parsed, &ParamCtx::closed())
+                                    }
+                                    Err(error) => self.report_expression_error(&at, error),
+                                }
                             }
                         }
                     }
@@ -1180,7 +1331,17 @@ impl<'a> Checker<'a> {
             .control
             .as_ref()
             .is_some_and(|control| control.kind == crate::source::ControlKind::Constant)
-            && field.value.as_deref() != Some("bool")
+            && !field.value.as_deref().is_some_and(|raw| {
+                self.aliases.parse(raw).is_ok_and(|expr| {
+                    matches!(
+                        expr.alternatives.as_slice(),
+                        [Primary::Scalar {
+                            kind: expr::ScalarKind::Bool,
+                            range: None
+                        }]
+                    )
+                })
+            })
         {
             report(
                 &mut self.diagnostics,
@@ -1450,7 +1611,7 @@ impl<'a> Checker<'a> {
                 };
                 for later in 1..list.len() {
                     for earlier in 0..later {
-                        if field_structure_eq(&list[earlier], &list[later]) {
+                        if field_structure_eq(self.aliases, &list[earlier], &list[later]) {
                             report(
                                 &mut self.diagnostics,
                                 &schema.at.child("fields").child(key).index(later),
@@ -1467,7 +1628,11 @@ impl<'a> Checker<'a> {
             }
             for later in 1..schema.patterns.len() {
                 for earlier in 0..later {
-                    if field_structure_eq(&schema.patterns[earlier], &schema.patterns[later]) {
+                    if field_structure_eq(
+                        self.aliases,
+                        &schema.patterns[earlier],
+                        &schema.patterns[later],
+                    ) {
                         report(
                             &mut self.diagnostics,
                             &schema.at.child("patterns").index(later),
@@ -2179,35 +2344,31 @@ fn is_ident(raw: &str) -> bool {
 /// Structural equality of two field specifications, ignoring documentation,
 /// diagnostic settings, deprecation metadata, and overrides. Expressions compare
 /// as parsed syntax, so `'a|b'` and `'a | b'` are identical.
-fn field_structure_eq(left: &FieldSpec, right: &FieldSpec) -> bool {
-    fn expr_eq(left: &Option<String>, right: &Option<String>) -> bool {
-        match (left, right) {
-            (None, None) => true,
-            (Some(left), Some(right)) => {
-                left == right
-                    || match (expr::parse(left), expr::parse(right)) {
-                        (Ok(left), Ok(right)) => left == right,
-                        _ => false,
-                    }
-            }
-            _ => false,
+fn field_structure_eq(aliases: &Aliases, left: &FieldSpec, right: &FieldSpec) -> bool {
+    let expr_eq = |left: Option<&str>, right: Option<&str>| match (left, right) {
+        (None, None) => true,
+        (Some(left), Some(right)) => {
+            left == right
+                || match (aliases.parse(left), aliases.parse(right)) {
+                    (Ok(left), Ok(right)) => left == right,
+                    _ => false,
+                }
         }
-    }
-    fn map_eq(left: &Option<MapSpec>, right: &Option<MapSpec>) -> bool {
-        match (left, right) {
-            (None, None) => true,
-            (Some(left), Some(right)) => {
-                expr_eq(&Some(left.key.clone()), &Some(right.key.clone()))
-                    && expr_eq(&left.value, &right.value)
-                    && left.body == right.body
-            }
-            _ => false,
+        _ => false,
+    };
+    let map_eq = |left: &Option<MapSpec>, right: &Option<MapSpec>| match (left, right) {
+        (None, None) => true,
+        (Some(left), Some(right)) => {
+            expr_eq(Some(&left.key), Some(&right.key))
+                && expr_eq(left.value.as_deref(), right.value.as_deref())
+                && left.body == right.body
         }
-    }
-    expr_eq(&left.key, &right.key)
-        && expr_eq(&left.value, &right.value)
+        _ => false,
+    };
+    expr_eq(left.key.as_deref(), right.key.as_deref())
+        && expr_eq(left.value.as_deref(), right.value.as_deref())
         && left.body == right.body
-        && expr_eq(&left.list, &right.list)
+        && expr_eq(left.list.as_deref(), right.list.as_deref())
         && map_eq(&left.map, &right.map)
         && left.card == right.card
         && left.scope == right.scope
@@ -2841,6 +3002,74 @@ mod tests {
             ),
         ]);
         assert_eq!(errors(&diagnostics), vec![DiagnosticCode::DuplicateName]);
+    }
+
+    #[test]
+    fn aliases_participate_in_unreachable_overload_checks() {
+        let diagnostics = run(&[
+            (
+                "aliases.json",
+                r#"{"aliases": {"base": "int | 'a'", "choice": "alias<BASE> | 'b'"}}"#,
+            ),
+            (
+                "rules.json",
+                r#"{
+                "schemas": {"test": {"fields": {"a": [
+                    {"value": "alias<choice>", "card": "0..1"},
+                    {"value": "int | 'a' | 'b'", "card": "0..1"}
+                ]}}}
+            }"#,
+            ),
+        ]);
+        assert_eq!(
+            errors(&diagnostics),
+            vec![DiagnosticCode::UnreachableOverload]
+        );
+    }
+
+    #[test]
+    fn invalid_aliases_report_declarations_and_uses() {
+        let diagnostics = run(&[
+            (
+                "aliases.json",
+                r#"{"aliases": {"a": "alias<b>", "b": "'prefix:{alias<a>}'", "c": "alias<missing>"}}"#,
+            ),
+            (
+                "rules.json",
+                r#"{
+                "aliases": {"A": "int"},
+                "schemas": {"test": {"list": "alias<unknown>"}}
+            }"#,
+            ),
+        ]);
+        let diagnostics: Vec<_> = diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.severity == Severity::Error)
+            .map(|diagnostic| {
+                (
+                    diagnostic.file.as_str(),
+                    diagnostic.pointer.as_str(),
+                    diagnostic.code,
+                )
+            })
+            .collect();
+        assert_eq!(
+            diagnostics,
+            [
+                ("aliases.json", "/aliases/b", DiagnosticCode::Parse),
+                (
+                    "aliases.json",
+                    "/aliases/c",
+                    DiagnosticCode::UndefinedReference
+                ),
+                ("rules.json", "/aliases/A", DiagnosticCode::DuplicateName),
+                (
+                    "rules.json",
+                    "/schemas/test/list",
+                    DiagnosticCode::UndefinedReference
+                ),
+            ]
+        );
     }
 
     #[test]
