@@ -592,7 +592,11 @@ fn apply_format_edits(source: &str, edits: &[parser::format::TextEdit]) -> Strin
 /// UTF-8 are skipped instead of re-encoded, and the formatter's own safety
 /// pipeline (no parse errors, token equivalence, idempotence) gates every
 /// write.
-fn format_workspace_file(path: &AbsPath) -> WorkspaceFileFormatOutcome {
+fn format_workspace_file(
+    path: &AbsPath,
+    logical_path: &text::LogicalPath,
+    ir: &rules::ir::RulesIr,
+) -> WorkspaceFileFormatOutcome {
     let bytes = match fs::read(path.as_path()) {
         Ok(bytes) => bytes,
         Err(_) => return WorkspaceFileFormatOutcome::Failed,
@@ -601,7 +605,7 @@ fn format_workspace_file(path: &AbsPath) -> WorkspaceFileFormatOutcome {
         return WorkspaceFileFormatOutcome::SkippedLegacyEncoding;
     };
     let parsed = parser::parse(parser::FileFormat::Script, &text);
-    let result = parser::format::format(&parsed);
+    let result = game::eu4::format_document(&parsed, Some(logical_path), ir);
     if result.skipped.is_some() {
         return WorkspaceFileFormatOutcome::SkippedUnsafe;
     }
@@ -679,7 +683,11 @@ fn format_workspace_files(
                     let Some(file) = files.get(index) else {
                         return;
                     };
-                    let outcome = format_workspace_file(&file.physical_path);
+                    let outcome = format_workspace_file(
+                        &file.physical_path,
+                        &file.logical_path,
+                        snapshot.ir(),
+                    );
                     outcomes.lock().expect("format outcome lock poisoned")[index] = Some(outcome);
                     let done = completed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
                     let last = reported.load(std::sync::atomic::Ordering::Relaxed);

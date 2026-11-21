@@ -24,6 +24,9 @@ pub(super) fn equivalent(original: &ParsedFile, formatted: &ParsedFile, depth: u
             let Some(after_text) = formatted.text(after.range()) else {
                 return false;
             };
+            if before_text == after_text {
+                return true;
+            }
             if before.kind() == TokenKind::Quoted
                 && let Some(before_script) = quoted_script(before_text, depth)
             {
