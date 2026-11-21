@@ -194,62 +194,38 @@ on a country, for example). The `expected:` line lists the valid scopes.
 
 ## LocalisationNotTranscoded
 
-The server no longer publishes this code: raw localisation documents carry
-no LSP diagnostics at all (see the note at the top), which retired the old
-release-path check for readable CJK under `localisation/…/replace/…`.
-Transcode release-tree files deliberately (**ParadoxCode: Encode File (EU4dll
-Escape Form)**, available with `transparentEncoding` turned off) or keep
-readable sources in the master tree outside `replace/`. The decoded-view
-provider no longer attaches it either: a `pdcloc://` view over
-readable bytes now carries the informational `LocalisationWillTranscodeOnSave`
-hint instead, because quoted CJK is escape-encoded on the next save.
+This historical code identified readable text in release files. The extension now uses the
+selected YML management mode. Manual conversion edits the buffer and supports Undo. Automatic
+writes the complete file in game form when the decoded editor saves.
 
 ## LocalisationWillTranscodeOnSave
 
-Emitted by the VS Code decoded-view provider, never by the server: the file
-is plain readable text whose quoted strings contain CJK. Editing continues in
-readable form, and the next save writes the scoped escaped form (comments and
-code stay readable UTF-8 on disk).
+The managed editor's status bar now identifies its save format directly.
 
 ## LocalisationMixedEncoding
 
-An EU4dll escape marker sits outside every quoted string — in code or comment
-position. Scoped transcoding only ever escapes inside strings, so such a
-marker is damage: no transformation is applied and the file is shown as-is.
-The error anchors on the marker itself. Move it into a string, repair it into
-a triple, or delete it (or restore the file from paratranz, the single source
-of truth for correct content).
+The managed YML editor shows the original bytes and marks the line when a damaged escape
+prevents decoding. Repair that sequence before saving. Valid escaped and readable text
+can occur together, including in comments and unquoted identifiers.
 
 ## LocalisationBrokenEscapeSequence
 
-An orphan escape marker inside a quoted string: a `0x10`–`0x13` marker whose
-two payload bytes are missing or damaged. Decoding passes orphans through
-untouched, so the character after the marker in a decoded view is wrong. Each
-orphan is flagged individually; fix the triple or delete the stray marker.
+The script contains a damaged EU4dll escape sequence. Inspect the indicated input position
+and repair the complete marker and payload before converting that span.
 
 ## LocalisationUnencodableCodePoint
 
-A character inside a quoted string of a configured script file cannot survive
-the EU4 transcoder: code points in U+0100–U+0FFF are silently mangled into
-triples (and back incorrectly), and code points beyond the BMP are destroyed.
-Encoding the string would corrupt these characters, so they are flagged per
-character. The 27 CP1252-mapped Latin letters (ä, é, ß, …) stay single bytes
-and are allowed. Characters outside strings — comments and code — stay
-verbatim UTF-8 under scoped saving and are never flagged.
+The character at the indicated position cannot round-trip through the script profile.
+This can occur in comments, identifiers or strings. Replace the character to include
+that span in an encoded selection.
 
 ## LocalisationEscapeRefused
 
-Emitted by the VS Code extension's save gate, never by the server: the editor
-buffer holds escape markers inside its quoted strings (encoding them again
-would double-encode), or in-span characters the ecosystem cannot round-trip,
-and the write was refused. The document on disk is untouched. Undo the paste
-or decode the text first.
+Historical code for a refused save. Current conversion errors report the input position
+and leave the backing file intact. Valid escape triples can coexist with readable text.
 
 ## ScriptLegacyEscapeVariant
 
-The script file decodes correctly, but its escape triples belong to a
-historical EU4dll escape-set variant rather than the canonical paratranz set:
-a decode → re-encode round trip does not reproduce the bytes. Nothing is
-broken today; the hint tells you that the next save through ParadoxCode
-normalizes the triples to the canonical set (content is preserved either way,
-and paratranz remains the judge of correctness).
+The script contains an accepted historical escape variant. Encoding preserves existing
+valid triples. Explicitly decoding and re-encoding the same selected text can produce
+canonical bytes with the same decoded value.

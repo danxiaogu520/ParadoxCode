@@ -39,7 +39,9 @@ pub use escape::{
     Decoded, InvalidUtf8, decode_file, decode_text, decode_value, encode_file, encode_text,
     file_unencodable_kind, script_roundtrip_is_canonical, unencodable_kind,
 };
-pub use file::{FileConversionError, decode_buffer, encode_buffer};
+pub use file::{
+    Direction, FileConversionError, convert_editor_buffer, decode_buffer, encode_buffer,
+};
 
 /// Bumped whenever encoding output for identical input changes (escape set adjustments,
 /// compensation fixes). Consumers that persist decoded text (index caches, previews)
@@ -88,8 +90,8 @@ impl EscapeSet {
     #[must_use]
     pub const fn contains(self, byte: u8) -> bool {
         match self {
-            Self::Paratranz => contains_const(&PARATRANZ_ESCAPE_BYTES, byte),
-            Self::DllFull => contains_const(&DLL_FULL_ESCAPE_BYTES, byte),
+            Self::Paratranz => PARATRANZ_MEMBERS[byte as usize],
+            Self::DllFull => DLL_FULL_MEMBERS[byte as usize],
         }
     }
 }
@@ -108,15 +110,17 @@ pub const DLL_FULL_ESCAPE_BYTES: [u8; 29] = [
     0x7D, 0x7E, 0x80, 0xA3, 0xA4, 0xA7, 0xBD, 0x3A, 0x3C, 0x3E, 0x3F, 0x7C, 0x2A,
 ];
 
-const fn contains_const(set: &[u8], byte: u8) -> bool {
+const PARATRANZ_MEMBERS: [bool; 256] = membership(&PARATRANZ_ESCAPE_BYTES);
+const DLL_FULL_MEMBERS: [bool; 256] = membership(&DLL_FULL_ESCAPE_BYTES);
+
+const fn membership(set: &[u8]) -> [bool; 256] {
+    let mut members = [false; 256];
     let mut i = 0;
     while i < set.len() {
-        if set[i] == byte {
-            return true;
-        }
+        members[set[i] as usize] = true;
         i += 1;
     }
-    false
+    members
 }
 
 /// A code point that encoding refuses to process, with the position where it occurs.

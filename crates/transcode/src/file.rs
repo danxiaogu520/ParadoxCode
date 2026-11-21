@@ -15,9 +15,12 @@ pub enum FileConversionError {
     Unencodable { error: EncodeError },
 }
 
+/// Operation applied to a whole buffer or an independently selected byte span.
 #[derive(Clone, Copy)]
-enum Direction {
+pub enum Direction {
+    /// Encode readable runs using the selected EU4 escape set.
     Encode(EscapeSet),
+    /// Decode valid escapes to readable UTF-8.
     Decode,
 }
 
@@ -41,6 +44,80 @@ pub fn encode_buffer(
 /// Refuses the complete file on invalid localisation UTF-8 or damaged triples.
 pub fn decode_buffer(input: &[u8], profile: Profile) -> Result<Vec<u8>, FileConversionError> {
     convert(input, profile, Direction::Decode)
+}
+
+/// Convert a large editor buffer in an isolated codec process. Ordinary analysis callers use
+/// the serial functions so workspace workers do not each start another group of threads.
+///
+/// # Errors
+/// Returns the exact same refusal and input offsets as the corresponding serial conversion.
+pub fn convert_editor_buffer(
+    input: &[u8],
+    profile: Profile,
+    direction: Direction,
+) -> Result<Vec<u8>, FileConversionError> {
+    const MIN_BYTES_PER_WORKER: usize = 256 * 1024;
+    const MAX_WORKERS: usize = 4;
+    let groups = (input.len() / MIN_BYTES_PER_WORKER).min(MAX_WORKERS);
+    if groups < 2 {
+        return convert(input, profile, direction);
+    }
+    let workers = std::thread::available_parallelism().map_or(1, |n| n.get().min(groups));
+    if workers > 1
+        && let Some(output) = convert_lines(input, profile, direction, workers)
+    {
+        return Ok(output);
+    }
+    // Failures are uncommon. Replaying once preserves global UTF-8 validation precedence
+    // and the full list of unencodable characters in the original, possibly multi-line run.
+    convert(input, profile, direction)
+}
+
+fn convert_lines(
+    input: &[u8],
+    profile: Profile,
+    direction: Direction,
+    workers: usize,
+) -> Option<Vec<u8>> {
+    // A literal LF is never legal inside an EU4 escape or a UTF-8 scalar. Include it in the
+    // previous slice so a malformed trailing marker is rejected there as well.
+    let mut chunks = Vec::with_capacity(workers);
+    let mut start = 0;
+    for index in 1..workers {
+        let target = (input.len() / workers) * index;
+        if target <= start {
+            continue;
+        }
+        let Some(distance) = input[target..].iter().position(|&byte| byte == b'\n') else {
+            break;
+        };
+        let end = target + distance + 1;
+        if end == input.len() {
+            break;
+        }
+        chunks.push(&input[start..end]);
+        start = end;
+    }
+    if chunks.is_empty() {
+        return None;
+    }
+    chunks.push(&input[start..]);
+    std::thread::scope(|scope| {
+        let mut handles = Vec::with_capacity(chunks.len() - 1);
+        for &chunk in &chunks[1..] {
+            handles.push(
+                std::thread::Builder::new()
+                    .spawn_scoped(scope, move || convert(chunk, profile, direction))
+                    .ok()?,
+            );
+        }
+        let mut outputs = Vec::with_capacity(chunks.len());
+        outputs.push(convert(chunks[0], profile, direction).ok()?);
+        for handle in handles {
+            outputs.push(handle.join().ok()?.ok()?);
+        }
+        Some(outputs.concat())
+    })
 }
 
 fn convert(
@@ -71,8 +148,12 @@ fn convert(
                 .map_or(input.len(), |offset| index + offset);
             let run = &input[index..next];
             match direction {
+                Direction::Encode(_) if run.is_ascii() => output.extend_from_slice(run),
                 Direction::Encode(escape_set) => {
                     encode_run(run, profile, escape_set, index, &mut output)?;
+                }
+                Direction::Decode if profile == Profile::Localisation => {
+                    output.extend_from_slice(run)
                 }
                 Direction::Decode => decode_run(run, &mut output),
             }
@@ -148,7 +229,7 @@ fn escape_at(
 fn payload_character(input: &[u8], start: usize, end: usize) -> Option<(usize, u8)> {
     let first = *input.get(start).filter(|_| start < end)?;
     let width = match first {
-        0..=0x7F => 1,
+        0..=0x7F => return Some((start + 1, first)),
         0xC2..=0xDF => 2,
         0xE0..=0xEF => 3,
         0xF0..=0xF4 => 4,
@@ -210,6 +291,85 @@ fn encode_run(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn worker_chunks_match_serial_bytes_in_source_order() {
+        for profile in [Profile::Localisation, Profile::Script] {
+            let mut line = encode_file("已有转义：是中国", profile, EscapeSet::Paratranz).unwrap();
+            line.extend_from_slice(" # 新文字\r\n".as_bytes());
+            if profile == Profile::Script {
+                line.extend_from_slice(b"# K\xf6nig\n");
+            }
+            let mut input = line.repeat(73);
+            input.extend_from_slice(b"\x11=f");
+            for direction in [
+                Direction::Encode(EscapeSet::Paratranz),
+                Direction::Encode(EscapeSet::DllFull),
+                Direction::Decode,
+            ] {
+                let expected = convert(&input, profile, direction).unwrap();
+                for workers in [2, 4] {
+                    assert_eq!(
+                        convert_lines(&input, profile, direction, workers).unwrap(),
+                        expected
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn large_buffer_refusals_retain_serial_precedence_counts_and_offsets() {
+        let lines = b"entry = value\n".repeat(32 * 1024);
+        let mut input = lines.clone();
+        input.extend_from_slice("bad = 😀\r\n".as_bytes());
+        input.extend_from_slice(&lines);
+        input.extend_from_slice("also_bad = 🐱".as_bytes());
+        let direction = Direction::Encode(EscapeSet::Paratranz);
+        let profile = Profile::Localisation;
+        let expected = convert(&input, profile, direction).unwrap_err();
+        let FileConversionError::Unencodable { error } = &expected else {
+            panic!("expected unencodable characters")
+        };
+        assert_eq!(error.unencodable.len(), 2);
+        assert_eq!(
+            convert_editor_buffer(&input, profile, direction).unwrap_err(),
+            expected
+        );
+
+        let mut broken = lines;
+        let offset = broken.len();
+        broken.extend_from_slice(b"\x10\n");
+        broken.extend_from_slice(&input);
+        assert_eq!(
+            convert_editor_buffer(&broken, profile, Direction::Decode).unwrap_err(),
+            FileConversionError::BrokenEscape { byte_index: offset }
+        );
+        broken.push(0xff);
+        assert_eq!(
+            convert_editor_buffer(&broken, profile, Direction::Decode).unwrap_err(),
+            FileConversionError::InvalidUtf8
+        );
+    }
+
+    #[test]
+    fn unbroken_lines_stay_serial() {
+        let input = "长".repeat(200_000);
+        assert!(
+            convert_lines(
+                input.as_bytes(),
+                Profile::Localisation,
+                Direction::Decode,
+                4
+            )
+            .is_none()
+        );
+        assert_eq!(
+            convert_editor_buffer(input.as_bytes(), Profile::Localisation, Direction::Decode)
+                .unwrap(),
+            input.as_bytes()
+        );
+    }
 
     #[test]
     fn complete_files_match_the_canonical_codec_and_round_trip() {

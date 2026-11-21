@@ -157,8 +157,7 @@ pub fn check(root: &Path) -> Result<Vec<String>, String> {
     }
     for (name, default) in [
         ("completion.iconPreview", json!(true)),
-        ("localisation.transparentEncoding", json!(false)),
-        ("localisation.autoOpen", json!("needsTranscode")),
+        ("localisation.encodingMode", json!("automatic")),
         ("preview.gameFonts", json!(true)),
         ("preview.chineseFontMod", json!("")),
         ("hover.texturePreview", json!(true)),
@@ -172,12 +171,6 @@ pub fn check(root: &Path) -> Result<Vec<String>, String> {
             &mut errors,
         );
     }
-    require(
-        properties["paradoxcode.localisation.autoOpen"]["enum"]
-            == json!(["needsTranscode", "always", "off"]),
-        "autoOpen alternatives drifted",
-        &mut errors,
-    );
     let commands = package["contributes"]["commands"]
         .as_array()
         .ok_or("missing commands")?;
@@ -503,12 +496,14 @@ pub fn execute(arguments: &[String]) -> Result<String, String> {
                 for name in [
                     "assets.mjs",
                     "loaded-files.mjs",
+                    "localisation-sync.mjs",
                     "preview.mjs",
                     "icon-picker.mjs",
                     "loc-format.mjs",
                     "server-path.mjs",
                     "search.mjs",
                     "transparent-loc.mjs",
+                    "script-selection.mjs",
                 ] {
                     process::run(
                         process::command("node").arg(root.join("editors/vscode/test").join(name)),

@@ -706,6 +706,16 @@
         "title": "%command.openSearch.title%",
         "category": "ParadoxCode",
         "icon": "$(search)"
+      },
+      {
+        "command": "paradoxcode.localisation.encodeSelection",
+        "title": "%commands.localisation.encodeSelection.title%",
+        "category": "ParadoxCode"
+      },
+      {
+        "command": "paradoxcode.localisation.decodeSelection",
+        "title": "%commands.localisation.decodeSelection.title%",
+        "category": "ParadoxCode"
       }
     ],
     "menus": {
@@ -717,12 +727,12 @@
         },
         {
           "command": "paradoxcode.localisation.decodeFile",
-          "when": "config.paradoxcode.localisation.transparentEncoding == false && resourceScheme == file && paradoxcode.transcodeEligible",
+          "when": "!paradoxcode.automaticLocalisation && resourceScheme == file && paradoxcode.transcodeEligible",
           "group": "navigation@4"
         },
         {
           "command": "paradoxcode.localisation.encodeFile",
-          "when": "config.paradoxcode.localisation.transparentEncoding == false && resourceScheme == file && paradoxcode.transcodeEligible",
+          "when": "!paradoxcode.automaticLocalisation && resourceScheme == file && paradoxcode.transcodeEligible",
           "group": "navigation@5"
         },
         {
@@ -734,27 +744,35 @@
       "commandPalette": [
         {
           "command": "paradoxcode.localisation.openDecoded",
-          "when": "config.paradoxcode.localisation.transparentEncoding == true"
+          "when": "paradoxcode.automaticLocalisation && paradoxcode.transcodeEligible"
         },
         {
           "command": "paradoxcode.localisation.revealOriginal",
-          "when": "config.paradoxcode.localisation.transparentEncoding == true && resourceScheme == pdcloc"
+          "when": "paradoxcode.automaticLocalisation && resourceScheme == pdcloc"
         },
         {
           "command": "paradoxcode.localisation.peekOriginal",
-          "when": "config.paradoxcode.localisation.transparentEncoding == true && resourceScheme == pdcloc"
+          "when": "paradoxcode.automaticLocalisation && resourceScheme == pdcloc"
         },
         {
           "command": "paradoxcode.localisation.endPeek",
-          "when": "config.paradoxcode.localisation.transparentEncoding == true && paradoxcode.peekingRaw"
+          "when": "paradoxcode.automaticLocalisation && paradoxcode.peekingRaw"
         },
         {
           "command": "paradoxcode.localisation.encodeFile",
-          "when": "config.paradoxcode.localisation.transparentEncoding == false"
+          "when": "!paradoxcode.automaticLocalisation && paradoxcode.transcodeEligible"
         },
         {
           "command": "paradoxcode.localisation.decodeFile",
-          "when": "config.paradoxcode.localisation.transparentEncoding == false"
+          "when": "!paradoxcode.automaticLocalisation && paradoxcode.transcodeEligible"
+        },
+        {
+          "command": "paradoxcode.localisation.encodeSelection",
+          "when": "!editorReadonly && editorHasSelection && resourceScheme == file && resourceFilename =~ /\\.txt$/i"
+        },
+        {
+          "command": "paradoxcode.localisation.decodeSelection",
+          "when": "!editorReadonly && editorHasSelection && resourceScheme == file && resourceFilename =~ /\\.txt$/i"
         }
       ],
       "keybindings": [
@@ -774,29 +792,39 @@
       "editor/context": [
         {
           "command": "paradoxcode.localisation.openDecoded",
-          "when": "config.paradoxcode.localisation.transparentEncoding == true && resourceScheme == file && paradoxcode.transcodeEligible",
+          "when": "paradoxcode.automaticLocalisation && resourceScheme == file && paradoxcode.transcodeEligible",
           "group": "paradoxcode@1"
         },
         {
           "command": "paradoxcode.openMissionIconPicker",
           "when": "paradoxcodeMissionFile",
           "group": "paradoxcode@2"
+        },
+        {
+          "command": "paradoxcode.localisation.encodeSelection",
+          "when": "!editorReadonly && editorHasSelection && resourceScheme == file && resourceFilename =~ /\\.txt$/i",
+          "group": "paradoxcode@3"
+        },
+        {
+          "command": "paradoxcode.localisation.decodeSelection",
+          "when": "!editorReadonly && editorHasSelection && resourceScheme == file && resourceFilename =~ /\\.txt$/i",
+          "group": "paradoxcode@4"
         }
       ],
       "explorer/context": [
         {
           "command": "paradoxcode.localisation.openDecoded",
-          "when": "config.paradoxcode.localisation.transparentEncoding == true && resourceFilename =~ /\\.(yml|txt)$/ && explorerResourceIsFolder == false",
+          "when": "paradoxcode.automaticLocalisation && resourceScheme == file && resourcePath =~ /(?:^|[\\\\\\/])localisation[\\\\\\/].*\\.yml$/i && explorerResourceIsFolder == false",
           "group": "paradoxcode@1"
         },
         {
           "command": "paradoxcode.localisation.encodeFile",
-          "when": "config.paradoxcode.localisation.transparentEncoding == false && explorerResourceIsFolder == false",
+          "when": "!paradoxcode.automaticLocalisation && resourceScheme == file && resourcePath =~ /(?:^|[\\\\\\/])localisation[\\\\\\/].*\\.yml$/i && explorerResourceIsFolder == false",
           "group": "paradoxcode@2"
         },
         {
           "command": "paradoxcode.localisation.decodeFile",
-          "when": "config.paradoxcode.localisation.transparentEncoding == false && explorerResourceIsFolder == false",
+          "when": "!paradoxcode.automaticLocalisation && resourceScheme == file && resourcePath =~ /(?:^|[\\\\\\/])localisation[\\\\\\/].*\\.yml$/i && explorerResourceIsFolder == false",
           "group": "paradoxcode@3"
         }
       ]
@@ -1078,28 +1106,21 @@
           "tags": [
             "experimental"
           ],
-          "markdownDescription": "%configuration.localisation.transparentEncoding.description%"
+          "markdownDescription": "%configuration.localisation.transparentEncoding.description%",
+          "markdownDeprecationMessage": "%configuration.localisation.transparentEncoding.deprecated%"
         },
-        "paradoxcode.localisation.autoOpen": {
+        "paradoxcode.localisation.encodingMode": {
           "type": "string",
           "enum": [
-            "needsTranscode",
-            "always",
-            "off"
+            "manual",
+            "automatic"
           ],
-          "default": "needsTranscode",
-          "markdownDescription": "%configuration.localisation.autoOpen.description%"
-        },
-        "paradoxcode.localisation.transparentScriptGlobs": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[^\\].*$"
-          },
-          "default": [
-            "**/*.txt"
+          "default": "automatic",
+          "enumDescriptions": [
+            "%configuration.localisation.encodingMode.manual%",
+            "%configuration.localisation.encodingMode.automatic%"
           ],
-          "markdownDescription": "%configuration.localisation.transparentScriptGlobs.description%"
+          "markdownDescription": "%configuration.localisation.encodingMode.description%"
         }
       }
     }

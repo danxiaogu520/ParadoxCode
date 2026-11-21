@@ -90,38 +90,29 @@ mission editor's context menu.
 
 ## Transparent Localisation (Chinese)
 
-Mods running the EU4dll double-byte patch store localisation as escape-tripled bytes. ParadoxCode
-ships a Rust-server-backed transcoder. By default, files keep their ordinary `file://` view:
+Choose **ParadoxCode › Localisation: Encoding Mode** in workspace settings. It applies to
+`localisation/**/*.yml`, including `replace/`. **Automatic** is the default. The previous
+`transparentEncoding` preference is honoured until a mode is set explicitly. A legacy
+`autoOpen: off` opts out of automatic management.
 
-- Use the editor-title **Decode Entire File (Readable Text)** button (down arrow) to write
-  readable text to disk, or **Encode Entire File (EU4dll Escape Form)** (up arrow) to write
-  escaped bytes. Comments, identifiers and strings are all converted. The buttons apply to
-  `localisation/**/*.yml` and workspace script files matching
-  `paradoxcode.localisation.transparentScriptGlobs` (`**/*.txt` by default).
-- Encoding preserves existing valid triples and converts every readable run. Decoding resolves
-  every triple and preserves readable UTF-8. Partially converted files converge without double
-  encoding. No quote-only mode or protocol option remains.
-- Save or close unsaved editors before converting. Each changed conversion writes the original
-  bytes to `.pre-transcode.bak`. No-op conversions write neither the file nor the backup. Edits
-  made while conversion is running require a retry.
-- Invalid localisation UTF-8, damaged triples anywhere in the file, and unencodable characters
-  anywhere in an encode input refuse the entire conversion and report input positions.
-- The connected server must advertise `pdcWholeFileTranscode`. Older servers are rejected before
-  conversion; update the server together with the extension.
-
-Automatic transparent encoding and editable `pdcloc://` views are **experimental** and
-**disabled by default**. Search and navigation have known limitations. Enable
-`paradoxcode.localisation.transparentEncoding` and reload the window to opt in:
-
-- `needsTranscode` opens eligible files when escaped/damaged content or text that saving would
-  convert occurs anywhere in the file. This includes comment-only CJK and bare identifiers.
-  `always` opens every eligible file; `off` requires an explicit command. Diff editors remain raw.
-- The decoded view uses the same whole-file codec as the manual buttons. Saving encodes the
-  entire file; valid existing triples are preserved. Damaged sequences and unencodable characters
-  prevent writes. Legacy files containing both readable text and escaped strings can be decoded
-  and saved into the complete file form.
-- The status bar and **Peek at the Raw Transcoded Form** command expose the original bytes.
-  Turn transparent encoding off and reload to return to the manual buttons.
+- In **Manual**, the editor-title Encode and Decode commands convert the current YML buffer,
+  including unsaved text, as one undoable edit spanning the first through last changed lines. Running either command from Explorer opens the
+  target in the editor. VS Code writes the result on its normal save schedule.
+- In **Automatic**, a managed YML opens as readable Chinese and saves in EU4dll format on the
+  editor's normal save schedule. The status bar identifies the decoded view. Mode changes apply live. A dirty decoded editor keeps its original save behaviour until closed. The raw-view and
+  peek commands remain available for inspecting disk contents.
+- In a workspace **TXT** file, select a continuous range and right-click **Convert Selection to
+  Game-Encoded Text** or **Convert Selection to Readable Chinese Text**. Script conversion uses
+  raw single-byte EU4dll escapes. Select complete escape sequences. Other files and unselected
+  bytes are outside the conversion.
+- When the editor can represent the result, the command is a normal undoable edit. A clean UTF-8
+  file may reopen with ISO-8859-1 to hold game bytes losslessly. For an edit that requires a
+  direct byte replacement, the extension asks before writing, checks for intervening changes
+  and backs up the original. Pending changes require explicit saving before a direct write.
+- Conversion uses the matching server executable's isolated binary stream. Damage or an
+  unencodable character refuses the operation. Existing valid escapes remain byte-exact on encode. Encoded YML starts with a UTF-8 BOM.
+- Editing and transcoding remain available on large YML files. Live language analysis pauses for
+  a buffer exceeding the server's 16 MiB text or 32 MiB message limit and resumes when the text fits.
 
 ## Configuration
 

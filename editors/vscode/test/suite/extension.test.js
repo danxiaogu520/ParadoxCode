@@ -114,11 +114,8 @@ suite('ParadoxCode VS Code extension host', () => {
       assert.equal(config.get('hover.eventCard'), true);
       assert.deepEqual(config.get('diagnostics.severityOverrides'), {});
       assert.deepEqual(config.get('localisation.preferredLanguages'), []);
-      assert.equal(config.get('localisation.transparentEncoding'), false);
-      assert.ok(
-        !available.includes('paradoxcode.localisation.openDecoded'),
-        'experimental decoded-view commands must not register by default',
-      );
+      assert.equal(config.get('localisation.encodingMode'), 'automatic');
+      assert.ok(available.includes('paradoxcode.localisation.openDecoded'));
       assert.deepEqual(config.get('completion.sourceLayers'), [
         'project',
         'dependencies',
@@ -171,14 +168,15 @@ suite('ParadoxCode VS Code extension host', () => {
   });
 
   test('server accessor reports an unavailable client', async () => {
-    const { acquireServerClient, setServerClient } = require('../../out/serverClient.js');
+    const { acquireServerClient, serverExecutable, setServerClient } = require('../../out/serverClient.js');
     const previous = await acquireServerClient(5_000).catch(() => undefined);
+    const executable = serverExecutable();
     setServerClient(undefined);
     try { await assert.rejects(
       acquireServerClient(10),
       (error) => error instanceof Error && error.name === 'ServerUnavailableError'
         && /not running/.test(error.message),
-    ); } finally { setServerClient(previous); }
+    ); } finally { setServerClient(previous, executable); }
   });
 
   test('default mission files keep normal views and decoded-path helpers remain compatible', async () => {
@@ -230,6 +228,123 @@ suite('ParadoxCode VS Code extension host', () => {
       fs.rmSync(path.join(root, 'missions'), { recursive: true, force: true });
     }
   });
+  test('YML modes switch live and preserve game bytes across automatic and manual saves', async function () {
+    if (!process.env.PDC_COMPLETION_SERVER) this.skip();
+    const folder = path.join(process.env.PDCLOC_HOST_WORKSPACE, 'localisation', 'replace');
+    fs.mkdirSync(folder, { recursive: true });
+    const file = path.join(folder, 'mode_l_english.yml');
+    const plain = 'l_english:\r\n key:0 "';
+    const original = Buffer.from(plain + '"\r\n');
+    const game = Buffer.from('\uFEFF' + plain + '\x10-N\x10ýV"\r\n');
+    fs.writeFileSync(file, original);
+    const uri = vscode.Uri.file(file);
+    const config = vscode.workspace.getConfiguration('paradoxcode.localisation');
+    try {
+      await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
+      const until = Date.now() + 10_000;
+      while (vscode.window.activeTextEditor?.document.uri.scheme !== 'pdcloc' && Date.now() < until) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      const editor = vscode.window.activeTextEditor;
+      assert.equal(editor.document.uri.scheme, 'pdcloc');
+      assert.deepEqual(fs.readFileSync(file), original);
+      assert.ok(await editor.edit(edit => edit.insert(editor.document.positionAt(plain.length), '中国')));
+      assert.deepEqual(fs.readFileSync(file), original);
+      assert.ok(await editor.document.save());
+      assert.deepEqual(fs.readFileSync(file), game);
+      const script = path.join(process.env.PDCLOC_HOST_WORKSPACE, 'ordinary.txt');
+      fs.writeFileSync(script, '# script');
+      const txt = await vscode.window.showTextDocument(vscode.Uri.file(script));
+      assert.ok(await txt.edit(edit => edit.insert(new vscode.Position(0, 8), ' 中文')));
+      await new Promise(resolve => setTimeout(resolve, 900));
+      assert.equal(vscode.window.activeTextEditor.document.uri.scheme, 'file');
+      assert.equal(txt.document.isDirty, true);
+      assert.equal(fs.readFileSync(script, 'utf8'), '# script');
+      assert.ok(await txt.document.save());
+      assert.equal(fs.readFileSync(script, 'utf8'), '# script 中文');
+      await config.update('encodingMode', 'manual', vscode.ConfigurationTarget.Workspace);
+      await vscode.commands.executeCommand('paradoxcode.localisation.decodeFile', uri);
+      const raw = vscode.window.activeTextEditor;
+      const readable = plain + '中国"\r\n';
+      assert.equal(raw.document.uri.toString(), uri.toString());
+      assert.equal(raw.document.getText(), readable);
+      assert.ok(raw.document.isDirty);
+      assert.deepEqual(fs.readFileSync(file), game);
+      assert.equal(fs.existsSync(file + '.pre-transcode.bak'), false);
+      await vscode.commands.executeCommand('undo');
+      assert.equal(raw.document.getText(), game.toString().slice(1));
+      await vscode.commands.executeCommand('redo');
+      assert.equal(raw.document.getText(), readable);
+      assert.ok(await raw.document.save());
+      const savedReadable = Buffer.from('\uFEFF' + readable);
+      assert.deepEqual(fs.readFileSync(file), savedReadable);
+      assert.ok(await raw.edit(edit => edit.insert(raw.document.positionAt(readable.length), '# 中')));
+      await vscode.commands.executeCommand('paradoxcode.localisation.encodeFile', uri);
+      assert.equal(raw.document.getText(), game.toString().slice(1) + '# \x10-N');
+      assert.deepEqual(fs.readFileSync(file), savedReadable);
+      assert.ok(await raw.document.save());
+      assert.deepEqual(fs.readFileSync(file), Buffer.concat([game, Buffer.from('# \x10-N')]));
+      assert.equal(fs.existsSync(file + '.pre-transcode.bak'), false);
+
+      // A plain UTF-8 buffer supplies the game BOM as part of its undoable edit.
+      const noBom = path.join(folder, 'utf8_l_english.yml');
+      fs.writeFileSync(noBom, readable);
+      await vscode.commands.executeCommand('paradoxcode.localisation.encodeFile', vscode.Uri.file(noBom));
+      const encodedDoc = vscode.window.activeTextEditor.document;
+      assert.ok(encodedDoc.isDirty);
+      assert.equal(fs.readFileSync(noBom, 'utf8'), readable);
+      assert.ok(await encodedDoc.save());
+      assert.deepEqual(fs.readFileSync(noBom), game);
+      assert.equal(fs.existsSync(noBom + '.pre-transcode.bak'), false);
+    } finally {
+      await config.update('encodingMode', undefined, vscode.ConfigurationTarget.Workspace);
+    }
+  });
+
+  test('TXT context commands save exact game bytes and recover readable UTF-8', async function () {
+    if (!process.env.PDC_COMPLETION_SERVER) this.skip();
+    const file = path.join(process.env.PDCLOC_HOST_WORKSPACE, 'selected.txt');
+    const uri = vscode.Uri.file(file);
+    const prefix = '# café 😀\r\nname = "';
+    const suffix = '" # untouched 中文\r\n';
+    const readable = Buffer.from(prefix + '中国' + suffix);
+    const game = Buffer.concat([Buffer.from(prefix), Buffer.from([0x10, 0x2d, 0x4e, 0x10, 0xfd, 0x56]), Buffer.from(suffix)]);
+    fs.writeFileSync(file, readable);
+    const edit = await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri, { encoding: 'utf8' }));
+    const start = edit.document.positionAt(prefix.length);
+    edit.selection = new vscode.Selection(start, edit.document.positionAt(prefix.length + 2));
+    await vscode.commands.executeCommand('paradoxcode.localisation.encodeSelection');
+    const encoded = vscode.window.activeTextEditor.document;
+    assert.ok(encoded.isDirty, 'a clean source converts as an undoable unsaved edit');
+    assert.deepEqual(fs.readFileSync(file), readable);
+    await vscode.commands.executeCommand('undo');
+    assert.deepEqual(fs.readFileSync(file), readable);
+    await vscode.commands.executeCommand('redo');
+    assert.ok(await vscode.window.activeTextEditor.document.save());
+    assert.deepEqual(fs.readFileSync(file), game);
+
+    const byteEditor = vscode.window.activeTextEditor;
+    const rawStart = byteEditor.document.positionAt(Buffer.byteLength(prefix));
+    byteEditor.selection = new vscode.Selection(rawStart, rawStart.translate(0, 6));
+    await vscode.commands.executeCommand('paradoxcode.localisation.decodeSelection');
+    const decoded = vscode.window.activeTextEditor.document;
+    assert.equal(decoded.getText(), readable.toString());
+    assert.ok(await decoded.save());
+    assert.deepEqual(fs.readFileSync(file), readable);
+
+    // Reopen the game bytes in an ordinary UTF-8 editor. U+FFFD on screen must not
+    // replace 0xFD in the conversion input. All malformed bytes are inside the selection.
+    const rawCopy = path.join(process.env.PDCLOC_HOST_WORKSPACE, 'selected-raw.txt');
+    fs.writeFileSync(rawCopy, game);
+    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(rawCopy), { encoding: 'utf8' });
+    const editor = await vscode.window.showTextDocument(doc);
+    editor.selection = new vscode.Selection(start, doc.positionAt(prefix.length + 6));
+    await vscode.commands.executeCommand('paradoxcode.localisation.decodeSelection');
+    assert.equal(doc.getText(), readable.toString());
+    assert.ok(await doc.save());
+    assert.deepEqual(fs.readFileSync(rawCopy), readable);
+  });
+
   test('replays completion through the editor after Unicode and CRLF edits', async function () {
     this.timeout(120_000);
     const server = process.env.PDC_COMPLETION_SERVER;

@@ -14,7 +14,7 @@
 | pdc | 语言服务器 crate 名；发行二进制为 `paradoxcode` |
 | EU4 | Europa Universalis IV 的通用缩写 |
 | EU4dll | 汉化转码库，透明转码的底层机制名 |
-| paratranz / latin1eu4 | 转码档位名（`paradoxcode.localisation.transparentScriptGlobs` 语境） |
+| paratranz / latin1eu4 | 转码档位名（TXT 选区转码） |
 | Problems 面板 / 视图 | VS Code 界面元素名，官方中文界面同样显示英文 |
 | owner/name | 发布仓库的形式描述 |
 
