@@ -1172,7 +1172,7 @@ fn schema_diagnostics_at_depth(
             .entry(property.key.to_ascii_lowercase())
             .or_insert((0, property.key_range))
             .0 += 1;
-        if field.deprecated {
+        if field.deprecated && field.deprecation_diagnostic.unwrap_or(true) {
             let mut diagnostic = Diagnostic::new(
                 DiagnosticCode::InvalidValue,
                 severity(field.severity),

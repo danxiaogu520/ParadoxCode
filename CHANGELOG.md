@@ -27,6 +27,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- EU4 government reform hovers show a single reform reference type. Hovers and completions mark
+  legacy government syntax as deprecated.
+
 - EU4 event and mission previews render localisation colours, escaped line breaks and inline
   country flags. Event descriptions grow with their content and scroll when they exceed the panel.
 

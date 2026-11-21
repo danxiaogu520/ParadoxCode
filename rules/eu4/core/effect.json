@@ -524,13 +524,13 @@
         },
         "add_government_reform": {
           "card": "0..*",
-          "doc": "If Dharma is active, enacts a government reform, replacing any existing reform at the same tier. If Dharma is not active, changes to the legacy government type that this reform has listed as its legacy_equivalent.",
+          "doc": "Enacts a government reform, replacing any existing reform at the same tier.",
           "scope": {
             "in": [
               "country"
             ]
           },
-          "value": "ref<government_reform> | ref<government_reform> | enum<hardcoded_legacygovernments>"
+          "value": "ref<government_reform>"
         },
         "add_great_project": {
           "body": "effect__add_great_project",
@@ -4805,13 +4805,13 @@
         },
         "remove_government_reform": {
           "card": "0..*",
-          "doc": "If Dharma is active, removes a government reform. If this reform was not in the highest achieved reform tier, the country can pick a new reform for free. No effect if Dharma isn't active.",
+          "doc": "Removes a government reform. If this reform was not in the highest achieved reform tier, the country can pick a new reform for free.",
           "scope": {
             "in": [
               "country"
             ]
           },
-          "value": "ref<government_reform> | ref<government_reform> | enum<hardcoded_legacygovernments>"
+          "value": "ref<government_reform>"
         },
         "remove_guarantee": {
           "card": "0..*",
@@ -5635,13 +5635,15 @@
         },
         "set_legacy_government": {
           "card": "0..*",
-          "doc": "Switches to the given government type.  No effect if Dharma is active.",
+          "deprecated": true,
+          "deprecation_diagnostic": false,
+          "doc": "Switches to a government type in the pre-Dharma system.",
           "scope": {
             "in": [
               "country"
             ]
           },
-          "value": "ref<government_reform>"
+          "value": "scalar"
         },
         "set_local_autonomy": {
           "card": "0..*",
@@ -6687,13 +6689,13 @@
         },
         "add_government_reform": {
           "card": "0..*",
-          "doc": "If Dharma is active, enacts a government reform, replacing any existing reform at the same tier. If Dharma is not active, changes to the legacy government type that this reform has listed as its legacy_equivalent.",
+          "doc": "Enacts a government reform, replacing any existing reform at the same tier.",
           "scope": {
             "in": [
               "country"
             ]
           },
-          "value": "ref<government_reform> | ref<government_reform> | enum<hardcoded_legacygovernments>"
+          "value": "ref<government_reform>"
         },
         "add_great_project": {
           "body": "effect__add_great_project",
@@ -10968,13 +10970,13 @@
         },
         "remove_government_reform": {
           "card": "0..*",
-          "doc": "If Dharma is active, removes a government reform. If this reform was not in the highest achieved reform tier, the country can pick a new reform for free. No effect if Dharma isn't active.",
+          "doc": "Removes a government reform. If this reform was not in the highest achieved reform tier, the country can pick a new reform for free.",
           "scope": {
             "in": [
               "country"
             ]
           },
-          "value": "ref<government_reform> | ref<government_reform> | enum<hardcoded_legacygovernments>"
+          "value": "ref<government_reform>"
         },
         "remove_guarantee": {
           "card": "0..*",
@@ -11798,13 +11800,15 @@
         },
         "set_legacy_government": {
           "card": "0..*",
-          "doc": "Switches to the given government type.  No effect if Dharma is active.",
+          "deprecated": true,
+          "deprecation_diagnostic": false,
+          "doc": "Switches to a government type in the pre-Dharma system.",
           "scope": {
             "in": [
               "country"
             ]
           },
-          "value": "ref<government_reform>"
+          "value": "scalar"
         },
         "set_local_autonomy": {
           "card": "0..*",

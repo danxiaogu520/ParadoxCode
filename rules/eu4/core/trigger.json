@@ -4107,7 +4107,7 @@
               "country"
             ]
           },
-          "value": "ref<government_reform> | ref<government_reform> | ref<government_reform> | enum<hardcoded_legacygovernments>"
+          "value": "ref<government_reform>"
         },
         "has_reform_on_level": {
           "capabilities": [
@@ -15156,7 +15156,7 @@
               "country"
             ]
           },
-          "value": "ref<government_reform> | ref<government_reform> | ref<government_reform> | enum<hardcoded_legacygovernments>"
+          "value": "ref<government_reform>"
         },
         "has_reform_on_level": {
           "capabilities": [
