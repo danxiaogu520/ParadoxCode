@@ -1793,7 +1793,7 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
 \t\t}\n\
 }\n";
     let gfx_uri = format!("{root_uri}/interface/test_sprites.gfx");
-    let mission_text = "main_tree = {\n\tslot = 1\n\tprobe = {\n\t\tposition = 1\n\t\ticon = mission_alpha\n\t\trequired_missions = { probe_upstream }\n\t\ttrigger = { always = yes }\n\t\teffect = { add_stability = 1 }\n\t}\n}\n";
+    let mission_text = "main_tree = {\n\tslot = 1\n\tprobe = {\n\t\tposition = 1\n\t\ticon = mission_alpha\n\t\trequired_missions = { probe_upstream probe_missing }\n\t\ttrigger = { always = yes }\n\t\teffect = { add_stability = 1 }\n\t}\n}\n";
     let mission_uri = format!("{root_uri}/missions/test.txt");
     // The `probe_upstream` prerequisite lives in a second missions file: the
     // call-site card resolves through the symbol layer, not the hovered file.
@@ -1823,6 +1823,7 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
         json!({"jsonrpc":"2.0","id":8,"method":"pdc/hoverCard","params":{"textDocument":{"uri":mission_uri},"position":{"line":4,"character":10}}}),
         json!({"jsonrpc":"2.0","id":10,"method":"textDocument/hover","params":{"textDocument":{"uri":mission_uri},"position":{"line":5,"character":26}}}),
         json!({"jsonrpc":"2.0","id":11,"method":"pdc/hoverCard","params":{"textureOnly":true,"textDocument":{"uri":mission_uri},"position":{"line":4,"character":10}}}),
+        json!({"jsonrpc":"2.0","id":12,"method":"textDocument/hover","params":{"textDocument":{"uri":mission_uri},"position":{"line":2,"character":4}}}),
         json!({"jsonrpc":"2.0","id":9,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);
@@ -1843,6 +1844,10 @@ fn hover_card_serves_mission_sprite_and_texture_payloads() {
     assert_eq!(card(10)["pdcPreview"]["kind"], "mission");
     assert_eq!(card(10)["pdcPreview"]["location"]["uri"], upstream_uri);
     assert_eq!(card(10)["pdcPreview"]["id"], "probe_upstream");
+    assert_eq!(
+        card(12)["pdcPreview"]["prerequisiteIssues"],
+        json!([["probe_missing", false]])
+    );
     assert_eq!(card(11)["card"]["kind"], "sprite");
 
     // Mission card: the icon asset plus the fixed node chrome, all resolved
@@ -1998,7 +2003,8 @@ country_event = {\n\
     let event_uri = format!("{root_uri}/events/test_events.txt");
     let loc_uri = format!("{root_uri}/localisation/test_l_english.yml");
     let long_desc = "Long event text ".repeat(64);
-    let loc_text = format!("l_english:\n demo_event.1.d:0 \"{long_desc}\"\n");
+    let loc_text =
+        format!("l_english:\n demo_event.1.d:0 \"{long_desc}\"\n demo_event.1.t:0 \"A title\"\n");
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -2038,6 +2044,24 @@ country_event = {\n\
     };
 
     assert_eq!(card(10)["pdcPreview"]["id"], "demo_event.1");
+    assert_eq!(card(10)["pdcPreview"]["eventType"], "country_event");
+    assert_eq!(card(10)["pdcPreview"]["title"], "A title");
+    assert_eq!(
+        card(10)["pdcPreview"]["titleSource"]["key"],
+        "demo_event.1.t"
+    );
+    assert_eq!(
+        card(10)["pdcPreview"]["missingLocalisation"],
+        json!(["demo_event.1.a", "demo_event.1.b"])
+    );
+    let hover = card(10);
+    let markdown = hover["contents"]["value"].as_str().unwrap();
+    assert!(markdown.contains(&format!("{loc_uri}#L3,2")), "{markdown}");
+    assert!(
+        markdown.contains(&format!("{event_uri}#L3,7")),
+        "{markdown}"
+    );
+    assert!(!markdown.contains("pdc-hover:"), "{markdown}");
     assert_eq!(card(12)["pdcPreview"]["id"], "demo_event.2");
     assert_eq!(card(11)["card"]["event"]["desc"]["value"], long_desc);
     assert_eq!(

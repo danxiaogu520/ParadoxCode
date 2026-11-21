@@ -477,7 +477,13 @@
         "on_convert": {
           "body": "effect",
           "card": "0..1",
-          "override": true
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         },
         "orthodox_icons": {
           "body": "religion_group_body__religion__orthodox_icons",

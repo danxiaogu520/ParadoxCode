@@ -21,7 +21,7 @@ use crate::support::{
     ParsedContent, ParsedInput, input_for_document, input_for_source_file,
     truncate_localisation_preview,
 };
-use crate::types::{CancellationToken, Cancelled};
+use crate::types::{CancellationToken, Cancelled, Location};
 
 const SCRIPTED_LOCALISATION_NAMES_CACHE_KEY: &str = "scripted-localisation-names";
 
@@ -376,9 +376,6 @@ pub(crate) fn localisation_text_from_source(
     // Mirror the engine preview derivation: transcoded (escaped) values decode to
     // the readable text the game renders; readable values pass through unchanged.
     let value = transcode::decode_value(value);
-    if value.is_empty() {
-        return None;
-    }
     let mut language = None;
     for node in parsed.root().children() {
         if node.range().start() > entry.range().start() {
@@ -403,28 +400,39 @@ pub(crate) fn localisation_text_from_source(
 /// (the first configured preference, English by default) survives the final
 /// filter; previews whose language is unknown (no language header) pass
 /// through unchanged.
+#[derive(Clone, Debug)]
+pub(crate) struct LocalisationPreview {
+    language: Option<String>,
+    pub(crate) value: String,
+    location: Location,
+}
+
 pub(crate) fn localisation_previews_for_name(
     snapshot: &AnalysisSnapshot,
     name: &str,
     cancellation: &CancellationToken,
-) -> Result<Vec<(Option<String>, String)>, Cancelled> {
-    let mut previews: Vec<(Option<String>, String)> = Vec::new();
+) -> Result<Vec<LocalisationPreview>, Cancelled> {
+    let mut previews: Vec<LocalisationPreview> = Vec::new();
     let mut priorities: Vec<u64> = Vec::new();
     for candidate in symbol_candidates_for_hover(snapshot, "localisation", name, cancellation)? {
-        let Some(preview) = localisation_preview(snapshot, &candidate) else {
-            continue;
-        };
-        if preview.1.is_empty() {
-            continue;
-        }
-        let claimed = previews.iter().position(|(language, _)| {
-            language.as_deref().is_some_and(|known| {
-                preview
-                    .0
+        let (language, value) = localisation_preview(snapshot, &candidate).unwrap_or_else(|| {
+            (
+                localisation_language(candidate.location.path.as_ref()),
+                String::new(),
+            )
+        });
+        let claimed = previews.iter().position(|preview| {
+            preview.language.as_deref().is_some_and(|known| {
+                language
                     .as_deref()
                     .is_some_and(|current| known.eq_ignore_ascii_case(current))
             })
         });
+        let preview = LocalisationPreview {
+            language,
+            value,
+            location: crate::resolution::definition_selection_location(&candidate),
+        };
         match claimed {
             // Same layer, later read order: the successor overrides the pick.
             Some(index) if candidate.priority == priorities[index] => {
@@ -439,7 +447,7 @@ pub(crate) fn localisation_previews_for_name(
         }
     }
     let target = snapshot.localisation_preview_language();
-    previews.retain(|(language, _)| preview_language_is_target(language.as_deref(), target));
+    previews.retain(|preview| preview_language_is_target(preview.language.as_deref(), target));
     Ok(previews)
 }
 
@@ -461,7 +469,10 @@ pub(crate) fn preview_language_is_target(language: Option<&str>, target: &str) -
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct LocalisationPreviewRow {
     pub label: Option<String>,
+    pub key: String,
+    pub language: Option<String>,
     pub value: String,
+    pub location: Option<Location>,
 }
 
 /// Maximum labelled fields rendered; further fields collapse into a count
@@ -492,7 +503,7 @@ pub(crate) fn symbol_localisation_preview(
 ) -> Result<Vec<LocalisationPreviewRow>, Cancelled> {
     if kind.eq_ignore_ascii_case("localisation") {
         let previews = localisation_previews_for_name(snapshot, symbol_name, cancellation)?;
-        return Ok(unlabelled_preview_rows(&previews));
+        return Ok(preview_rows(snapshot, None, symbol_name, &previews, true));
     }
     if !kind_is_localisation_displayable(snapshot, kind) {
         return Ok(Vec::new());
@@ -545,9 +556,6 @@ pub(crate) fn symbol_localisation_preview(
     for (name, range) in references {
         cancellation.checkpoint()?;
         let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
-        if previews.is_empty() {
-            continue;
-        }
         let label = generated_key_field(snapshot, kind, symbol_name, &name)
             .map(str::to_owned)
             .or_else(|| {
@@ -555,7 +563,11 @@ pub(crate) fn symbol_localisation_preview(
                     .as_ref()
                     .and_then(|input| enclosing_field_label(input, range))
             });
-        push_preview_rows(&mut rows, &mut seen, label, &previews);
+        for row in preview_rows(snapshot, label, &name, &previews, range != selection_range) {
+            if seen.insert((row.label.clone(), row.key.clone(), row.value.clone())) {
+                rows.push(row);
+            }
+        }
     }
     collect_generated_preview_rows(
         snapshot,
@@ -590,7 +602,7 @@ fn collect_generated_preview_rows(
     kind: &str,
     symbol_name: &str,
     rows: &mut Vec<LocalisationPreviewRow>,
-    seen: &mut BTreeSet<(Option<String>, String)>,
+    seen: &mut BTreeSet<(Option<String>, String, String)>,
     cancellation: &CancellationToken,
 ) -> Result<(), Cancelled> {
     let ir = snapshot.ir();
@@ -603,12 +615,17 @@ fn collect_generated_preview_rows(
                     cancellation.checkpoint()?;
                     let name = binding.expand(ir.strings(), template, symbol_name);
                     let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
-                    push_preview_rows(
-                        rows,
-                        seen,
+                    for row in preview_rows(
+                        snapshot,
                         Some(ir.strings.resolve(*label).to_owned()),
+                        &name,
                         &previews,
-                    );
+                        binding.required,
+                    ) {
+                        if seen.insert((row.label.clone(), row.key.clone(), row.value.clone())) {
+                            rows.push(row);
+                        }
+                    }
                 }
             }
         }
@@ -616,34 +633,35 @@ fn collect_generated_preview_rows(
     Ok(())
 }
 
-/// Appends one row per binding label and value; repeated rows and empty
-/// values are dropped without hiding distinct bindings with identical text.
-fn push_preview_rows(
-    rows: &mut Vec<LocalisationPreviewRow>,
-    seen: &mut BTreeSet<(Option<String>, String)>,
+/// Builds a row for each resolved value, or for a missing required key.
+pub(crate) fn preview_rows(
+    snapshot: &AnalysisSnapshot,
     label: Option<String>,
-    previews: &[(Option<String>, String)],
-) {
-    for (_, value) in previews {
-        if value.is_empty() || !seen.insert((label.clone(), value.clone())) {
-            continue;
-        }
-        rows.push(LocalisationPreviewRow {
-            label: label.clone(),
-            value: value.clone(),
-        });
-    }
-}
-
-/// Wraps the previews of one key as unlabelled rows.
-pub(crate) fn unlabelled_preview_rows(
-    previews: &[(Option<String>, String)],
+    key: &str,
+    previews: &[LocalisationPreview],
+    required: bool,
 ) -> Vec<LocalisationPreviewRow> {
+    if previews.is_empty() && required {
+        return vec![LocalisationPreviewRow {
+            label,
+            key: key.to_owned(),
+            language: Some(snapshot.localisation_preview_language().to_owned()),
+            value: "Missing localisation".to_owned(),
+            location: None,
+        }];
+    }
     previews
         .iter()
-        .map(|(_, value)| LocalisationPreviewRow {
-            label: None,
-            value: value.clone(),
+        .filter(|preview| !preview.value.is_empty())
+        .map(|preview| LocalisationPreviewRow {
+            label: label.clone(),
+            key: key.to_owned(),
+            language: preview
+                .language
+                .as_deref()
+                .map(|language| language.strip_prefix("l_").unwrap_or(language).to_owned()),
+            value: preview.value.clone(),
+            location: Some(preview.location.clone()),
         })
         .collect()
 }
@@ -696,10 +714,11 @@ fn enclosing_field_label(input: &ParsedInput, range: TextRange) -> Option<String
 
 /// Formats the localisation-preview section over labelled row groups as a
 /// markdown table, capped per field with a trailing count line for further
-/// fields.  Rows carry no language — the preview language is the
-/// workspace-configured target, so the table needs only the Field column
-/// (when any shown row carries a label) and the text.
-pub(crate) fn localisation_preview_section(rows: &[LocalisationPreviewRow]) -> String {
+/// fields. The key links to the entry that supplied the displayed text.
+pub(crate) fn localisation_preview_section(
+    rows: &[LocalisationPreviewRow],
+    mut source_link: impl FnMut(&str, Location) -> String,
+) -> String {
     let mut shown_rows = Vec::<&LocalisationPreviewRow>::new();
     let mut fields_shown = 0;
     let mut fields_hidden = 0usize;
@@ -727,6 +746,8 @@ pub(crate) fn localisation_preview_section(rows: &[LocalisationPreviewRow]) -> S
         headers.push("Field");
     }
     headers.push("Text");
+    headers.push("Key");
+    headers.push("Language");
     let mut lines = vec![
         format!("| {} |", headers.join(" | ")),
         format!("| {} |", vec!["---"; headers.len()].join(" | ")),
@@ -739,6 +760,11 @@ pub(crate) fn localisation_preview_section(rows: &[LocalisationPreviewRow]) -> S
             ));
         }
         cells.push(escape_table_cell(&row.value));
+        cells.push(row.location.as_ref().map_or_else(
+            || escape_table_cell(&row.key),
+            |location| source_link(&row.key, location.clone()),
+        ));
+        cells.push(escape_table_cell(row.language.as_deref().unwrap_or("—")));
         format!("| {} |", cells.join(" | "))
     }));
 

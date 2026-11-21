@@ -52,7 +52,9 @@
           "card": "0..1",
           "doc": "Conditions for provinces to be highlighted by the agenda. Root = country, this = province.",
           "scope": {
-            "push": "province"
+            "set": {
+              "this": "province"
+            }
           }
         },
         "selection_weight": {

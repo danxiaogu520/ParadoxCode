@@ -609,6 +609,7 @@ flat data at compile time; the runtime does no dynamic dispatch.
 - `registers.chain` is allowed only for `previous` and `from` roles. It means the register concatenates (`prev_prev`, `fromfrom`,
   …), replacing the former hard-coded register list and the hand-written
   `prev_prev` entries in `scope_names`.
+- `registers.chain_separator` gives an exact separator for a chained register. EU4 uses `"_"` for `PREV_PREV` and `""` for `FROMFROM`.
 - Link keys may be templates (§2), replacing `dynamic_scope_prefixes`;
   `dynamic_value_prefixes` are likewise expressed as value templates
   (`'variable:{ref<variable>}'`).

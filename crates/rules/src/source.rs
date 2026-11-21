@@ -556,6 +556,9 @@ pub struct RegisterSpec {
     /// Whether the register chains (`prev_prev`, `fromfrom`, …).
     #[serde(default)]
     pub chain: Option<bool>,
+    /// Exact separator between repeated names. An empty string joins names directly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chain_separator: Option<String>,
 }
 
 /// Game-independent state slots selected by scope register declarations.

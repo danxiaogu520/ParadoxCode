@@ -2611,7 +2611,12 @@ fn ir_empty_blocks_offer_schema_fields_and_hover() {
     let key_pos = source.find("immediate").unwrap() as u32 + 2;
     let value = hover(&host.snapshot(), &id, key_pos).expect("schema hover");
     assert!(value.contents.contains("block"), "{}", value.contents);
-    assert!(value.contents.contains("Source:"), "{}", value.contents);
+    assert!(
+        value.contents.contains("| `ROOT` | `country` |"),
+        "{}",
+        value.contents
+    );
+    assert!(!value.contents.contains("Source:"), "{}", value.contents);
     assert!(!semantic_tokens(&host.snapshot(), &id).is_empty());
 }
 

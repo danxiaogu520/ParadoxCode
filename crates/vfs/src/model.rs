@@ -35,6 +35,8 @@ pub struct SourceRoot {
     pub id: SourceRootId,
     /// Source identity role; load priority is determined by `order`.
     pub kind: SourceRootKind,
+    /// User-configured dependency identity for editor presentation.
+    pub name: Option<String>,
     /// Canonical filesystem path.
     pub path: AbsPath,
     /// Globally unique low-to-high load order, independent of root kind.
@@ -51,6 +53,7 @@ impl SourceRoot {
         Self {
             id,
             kind,
+            name: None,
             path,
             order: id.get(),
             writable,

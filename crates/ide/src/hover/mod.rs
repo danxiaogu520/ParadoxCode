@@ -53,15 +53,6 @@ pub fn hover_with_cancellation(
         let (owner_kind, owner_name) = owner.as_ref().map_or((None, None), |(kind, name)| {
             (Some(kind.as_ref()), Some(name.as_str()))
         });
-        let occurrences = input
-            .hir
-            .as_deref()
-            .map(|hir| {
-                hir.parameter_references_for_owner(definition.owner_range)
-                    .filter(|reference| reference.name.eq_ignore_ascii_case(&definition.name))
-                    .count()
-            })
-            .unwrap_or(0);
         // Presence uses the invocation-form model (activation scoping) when the
         // owning definition resolves with a template, so the definition-site
         // hover agrees with the completion snippet's tabstops.
@@ -90,7 +81,7 @@ pub fn hover_with_cancellation(
             |name| format!("scripted definition {}", code_span(name)),
         );
         let mut section = format!(
-            "- Local to {owner}; inferred from its first use\n- Presence: `{}`\n- Syntax: `{syntax}`\n- Occurrences in owner: {occurrences}",
+            "- Local to {owner}\n- Presence: `{}`\n- Syntax: `{syntax}`",
             if optional {
                 "optional"
             } else {
@@ -178,19 +169,37 @@ pub fn hover_with_cancellation(
             cancellation,
         )?;
         if matches!(definition.kind.as_str(), "event" | "mission") {
-            let location =
-                crate::support::local_location(&input, definition.symbol.selection_range);
-            let title = model
-                .preview
-                .take()
-                .filter(|target| target.location == location)
-                .and_then(|target| target.title);
-            model.preview = Some(crate::PreviewTarget {
-                title,
-                kind: definition.kind.clone(),
-                id: definition.name.clone(),
-                location,
-            });
+            let local = crate::resolution::ResolutionDefinition {
+                location: definition.symbol.location.clone(),
+                selection_range: definition.symbol.selection_range,
+                priority: 0,
+            };
+            if model.preview.as_ref().is_none_or(|target| {
+                target.location != crate::resolution::definition_selection_location(&local)
+            }) {
+                let localisation = crate::localisation::symbol_localisation_preview(
+                    snapshot,
+                    &definition.kind,
+                    &definition.name,
+                    &local,
+                    cancellation,
+                )?;
+                model.preview = Some(symbol::preview_target(
+                    snapshot,
+                    &definition.kind,
+                    &definition.name,
+                    &local,
+                    &localisation,
+                    cancellation,
+                )?);
+            }
+        }
+        if let Some(scope) = input
+            .hir
+            .as_deref()
+            .and_then(|hir| rules::scope_section(snapshot.ir(), hir, position))
+        {
+            model.push_section(scope);
         }
         return Ok(Some(model.into_hover_with_range(range)));
     }
@@ -242,7 +251,13 @@ pub fn hover_with_cancellation(
         if let Some(source) =
             rules::query_source_hover(snapshot, &input, position, &word, cancellation)?
         {
-            best.push_section(source.render());
+            best.push_model(source);
+        } else if let Some(scope) = input
+            .hir
+            .as_deref()
+            .and_then(|hir| rules::scope_section(snapshot.ir(), hir, position))
+        {
+            best.push_section(scope);
         }
         return Ok(Some(best.into_hover_with_range(range)));
     }

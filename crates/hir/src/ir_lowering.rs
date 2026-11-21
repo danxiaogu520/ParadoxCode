@@ -1426,7 +1426,12 @@ pub(super) fn transition_state(
         }
         for (reg, scope) in e.set.iter() {
             let name = ir.strings().resolve(*reg);
-            let value = ScopeValue::known_single(ir.strings().resolve(*scope));
+            let scope = ir.strings().resolve(*scope);
+            let value = if scope == "any" {
+                ScopeValue::Unknown
+            } else {
+                ScopeValue::known_single(scope)
+            };
             if let Some((register, depth)) = ir.scopes.register(ir.strings(), name) {
                 match register.role {
                     rules::source::RegisterRole::Root => state.root = value,

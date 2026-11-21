@@ -1251,7 +1251,7 @@ fn semantic_rules_drive_value_completion_and_hover() {
     let property_hover = hover(&snapshot, &id, property).expect("semantic hover");
     assert!(property_hover.contents.contains("### Trigger `foo`"));
     assert!(property_hover.contents.starts_with("### Trigger `foo`"));
-    assert!(property_hover.contents.contains("- value: yes or no"));
+    assert!(property_hover.contents.contains("| Any | `yes` or `no` |"));
 
     assert!(!property_hover.contents.contains("context: `trigger`"));
     assert!(!property_hover.contents.contains("shape: `scalar`"));
@@ -1262,7 +1262,7 @@ fn semantic_rules_drive_value_completion_and_hover() {
     let value_hover = hover(&snapshot, &id, value_position).expect("value hover");
     assert!(value_hover.contents.contains("### Trigger value `yes`"));
     assert!(value_hover.contents.starts_with("### Trigger value `yes`"));
-    assert!(!value_hover.contents.contains("does not match"));
+    assert!(!value_hover.contents.contains("Invalid value"));
 
     let (invalid_host, invalid_id) = semantic_snapshot("trigger = { foo = maybe }\n");
     let invalid_text = "trigger = { foo = maybe }\n";
@@ -1273,7 +1273,7 @@ fn semantic_rules_drive_value_completion_and_hover() {
     assert!(
         invalid_hover
             .contents
-            .contains("The current value does not match an allowed value type.")
+            .contains("**Invalid value.** `maybe` must be yes or no.")
     );
 }
 
@@ -1337,6 +1337,7 @@ fn scripted_definition_completion_snippet_includes_parameters() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
         kind: SourceRootKind::Project,
+        name: None,
         path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
@@ -2213,6 +2214,7 @@ fn fuzzy_completion_prefers_prefix_over_substring_matches() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
         kind: SourceRootKind::Project,
+        name: None,
         path: AbsPath::normalize(&root),
         order: 0,
         writable: true,
