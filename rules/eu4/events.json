@@ -332,19 +332,11 @@
           "override": true,
           "value": "float"
         },
-        "is_triggered_only": [
-          {
-            "card": "0..1",
-            "doc": "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse).",
-            "value": "bool"
-          },
-          {
-            "card": "0..1",
-            "doc": "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse).",
-            "severity": "warning",
-            "value": "'yes'"
-          }
-        ],
+        "is_triggered_only": {
+          "card": "0..1",
+          "doc": "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse).",
+          "value": "bool"
+        },
         "major": {
           "card": "0..1",
           "doc": "If yes, every country will be notified which options are selected.",
@@ -627,7 +619,7 @@
           "card": "0..*",
           "doc": "In country scope, spawns a specific unit (e.g. \"british_redcoat\") for the current scope in the defined province scope. In province scope, spawns a specific unit in the current province scope for the defined country scope. Units can be found in /Europa Universalis IV/common/units/*.txt.",
           "key": "ref<unit_type>",
-          "value": "scope<province> | ref<province_id> | scope<country> | ref<country_tag>"
+          "value": "alias<province> | alias<country>"
         },
         {
           "body": "effect",
@@ -894,7 +886,7 @@
           "card": "0..*",
           "doc": "In country scope, spawns a specific unit (e.g. \"british_redcoat\") for the current scope in the defined province scope. In province scope, spawns a specific unit in the current province scope for the defined country scope. Units can be found in /Europa Universalis IV/common/units/*.txt.",
           "key": "ref<unit_type>",
-          "value": "scope<province> | ref<province_id> | scope<country> | ref<country_tag>"
+          "value": "alias<province> | alias<country>"
         },
         {
           "body": "effect",

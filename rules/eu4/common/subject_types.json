@@ -392,7 +392,7 @@
         "liberty_desire_revolution": {
           "card": "0..1",
           "doc": "Liberty desire at 100% revolution spread in country",
-          "value": "int | float"
+          "value": "float"
         },
         "liberty_desire_same_dynasty": {
           "card": "0..1",
@@ -787,7 +787,7 @@
         "modifier": {
           "card": "1",
           "doc": "Block of modifiers applied while the containing entry is active.",
-          "value": "ref<static_modifier> | ref<event_modifier>"
+          "value": "alias<modifier>"
         },
         "trigger": {
           "body": "trigger",
@@ -816,7 +816,7 @@
         "modifier": {
           "card": "1",
           "doc": "Block of modifiers applied while the containing entry is active.",
-          "value": "ref<static_modifier> | ref<event_modifier>"
+          "value": "alias<modifier>"
         },
         "trigger": {
           "body": "trigger",

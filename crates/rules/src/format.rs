@@ -146,6 +146,7 @@ pub fn render(source: &RuleFile, expanded: bool) -> Result<String, serde_json::E
             ("files", json!({})),
             ("schemas", json!({})),
             ("mixins", json!({})),
+            ("aliases", json!({})),
             ("types", json!({})),
             ("traits", json!({})),
             ("enums", json!({})),

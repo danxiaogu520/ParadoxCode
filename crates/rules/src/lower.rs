@@ -22,8 +22,8 @@ use std::fmt;
 use rustc_hash::FxHashMap;
 
 use crate::compile::{
-    self, Actual, Diagnostic, SchemaRef, first_name, parse_card, parse_def_type, parse_schema_key,
-    parse_schema_ref,
+    self, Actual, Aliases, Diagnostic, SchemaRef, first_name, parse_card, parse_def_type,
+    parse_schema_key, parse_schema_ref,
 };
 use crate::expr::{self, Argument, Expr, LiteralPart, Param, Primary, ScalarKind, Segment};
 use crate::ir::{
@@ -31,7 +31,7 @@ use crate::ir::{
     FieldId, FieldValue, FileResolution, FileRule, GameConfig, Interner, LinkInfo, Matcher,
     MatcherId, PatternPart, Provenance, RefTarget, RegisterInfo, RootRule, RulesIr, Schema,
     SchemaId, ScopeEffect, ScopeModel, ScopeRef, SubtypeInfo, Symbol, TraitArgument, TraitId,
-    TraitImpl, TraitInfo, TypeId, TypeInfo, TypeResolution,
+    TraitImpl, TraitInfo, TypeId, TypeInfo, TypeResolution, ValueType,
 };
 use crate::matcher::FileMatcher;
 use crate::source::{
@@ -85,21 +85,22 @@ impl std::error::Error for LowerError {}
 /// Returns the error-severity diagnostics of [`compile::check`] when the
 /// sources do not pass the compile-time semantic checks.
 pub fn lower(sources: &[(String, RuleFile)], game: GameConfig) -> Result<RulesIr, LowerError> {
-    let errors = compile::check(sources)
+    let (diagnostics, aliases) = compile::check_with_aliases(sources);
+    let errors = diagnostics
         .into_iter()
         .filter(|diagnostic| diagnostic.severity == Severity::Error)
         .collect::<Vec<_>>();
     if !errors.is_empty() {
         return Err(LowerError::Diagnostics(errors));
     }
-    Ok(Lowering::new(sources, game).run())
+    Ok(Lowering::new(sources, &aliases, game).run())
 }
 
 /// Validates projected matcher dependencies after source checks, without
 /// recursively invoking the source checker. Ordinary block-body edges are not
 /// matcher dependencies and therefore cannot create a query cycle.
-pub(crate) fn check_queries(sources: &[(String, RuleFile)]) -> Vec<Diagnostic> {
-    let mut lowering = Lowering::new(sources, GameConfig::default());
+pub(crate) fn check_queries(sources: &[(String, RuleFile)], aliases: &Aliases) -> Vec<Diagnostic> {
+    let mut lowering = Lowering::new(sources, aliases, GameConfig::default());
     lowering.register_names();
     lowering.register_types();
     lowering.fill_types();
@@ -326,6 +327,7 @@ struct FieldKey {
     key_loc: Option<Symbol>,
     key: MatcherId,
     value: FieldValue,
+    value_types: Box<[ValueType]>,
     card: Card,
     scope: Option<ScopeEffect>,
     def: Option<DefSpec>,
@@ -392,6 +394,7 @@ enum RefKey {
 /// The lowering pass's working state.
 struct Lowering<'a> {
     sources: &'a [(String, RuleFile)],
+    aliases: &'a Aliases,
     game: GameConfig,
     strings: Interner,
     game_id: Symbol,
@@ -423,12 +426,13 @@ struct Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
-    fn new(sources: &'a [(String, RuleFile)], game: GameConfig) -> Self {
+    fn new(sources: &'a [(String, RuleFile)], aliases: &'a Aliases, game: GameConfig) -> Self {
         let identity = game.game_id().to_owned();
         let mut strings = Interner::default();
         let game_id = strings.intern_folded(&identity);
         Self {
             sources,
+            aliases,
             game,
             strings,
             game_id,
@@ -490,6 +494,18 @@ impl<'a> Lowering<'a> {
     fn register_names(&mut self) {
         let sources = self.sources;
         for (file_name, file) in sources {
+            // Alias-only sources have no runtime provenance.
+            if !file.aliases.is_empty()
+                && file.schemas.is_empty()
+                && file.traits.is_empty()
+                && file.enums.is_empty()
+                && file.mixins.is_empty()
+                && file.types.is_empty()
+                && file.scopes.is_none()
+                && file.files.is_empty()
+            {
+                continue;
+            }
             // A source file name is data, so it keeps its spelling.
             let file_symbol = self.strings.intern_verbatim(file_name);
             for (key, spec) in &file.schemas {
@@ -1102,8 +1118,11 @@ impl<'a> Lowering<'a> {
             }
             DraftKey::Expression(raw) => self.lower_expr_text(context, raw),
         };
+        let mut value_types = Box::default();
         let value = if let Some(raw) = spec.value.as_deref() {
-            FieldValue::Scalar(self.lower_expr_text(context, raw))
+            let (matcher, types) = self.lower_scalar_value(context, raw);
+            value_types = types;
+            FieldValue::Scalar(matcher)
         } else if let Some(body) = spec.body.as_deref() {
             // `self` stays a self-reference so the arena needs no
             // self-referential schema edge; `child` resolves it against the
@@ -1157,6 +1176,7 @@ impl<'a> Lowering<'a> {
                 .map(|s| self.strings.intern_verbatim(s)),
             key,
             value,
+            value_types,
             card: card(&spec.card),
             scope,
             def,
@@ -1176,6 +1196,7 @@ impl<'a> Lowering<'a> {
             key_loc: field.key_loc,
             key: field.key,
             value: field.value,
+            value_types: field.value_types.clone(),
             card: field.card,
             scope: field.scope.clone(),
             def: field.def.clone(),
@@ -1263,7 +1284,7 @@ impl<'a> Lowering<'a> {
         draft: &FieldDraft<'_>,
     ) -> Option<(TypeId, Option<Symbol>)> {
         if let DraftKey::Expression(raw) = draft.key
-            && let Ok(parsed) = expr::parse(raw)
+            && let Ok(parsed) = self.aliases.parse(raw)
             && let Some(shorthand) = self.def_shorthand(context, &parsed)
         {
             return Some(shorthand);
@@ -1357,10 +1378,61 @@ impl<'a> Lowering<'a> {
     }
 
     fn lower_expr_text(&mut self, context: &FieldContext<'_>, raw: &str) -> MatcherId {
-        match expr::parse(raw) {
+        match self.aliases.parse(raw) {
             Ok(parsed) => self.lower_expr(context, &parsed),
             Err(_) => self.opaque(),
         }
+    }
+
+    fn lower_scalar_value(
+        &mut self,
+        context: &FieldContext<'_>,
+        raw: &str,
+    ) -> (MatcherId, Box<[ValueType]>) {
+        let Ok(source) = expr::parse(raw) else {
+            return (self.opaque(), Box::default());
+        };
+        if !source
+            .alternatives
+            .iter()
+            .any(|part| matches!(part, Primary::Alias(_)))
+        {
+            let matcher = match self.aliases.expand(source) {
+                Ok(parsed) => self.lower_expr(context, &parsed),
+                Err(_) => self.opaque(),
+            };
+            return (matcher, Box::default());
+        }
+
+        let mut alternatives = Vec::new();
+        let mut value_types = Vec::with_capacity(source.alternatives.len());
+        for part in source.alternatives {
+            if let Primary::Alias(name) = part {
+                let Ok(target) = self.aliases.resolve(&name).cloned() else {
+                    return (self.opaque(), Box::default());
+                };
+                alternatives.extend(
+                    target
+                        .alternatives
+                        .iter()
+                        .map(|part| self.lower_primary(context, part)),
+                );
+                value_types.push(ValueType::Alias(self.strings.intern_folded(&name)));
+            } else {
+                let Ok(parsed) = self.aliases.expand(Expr {
+                    alternatives: vec![part],
+                }) else {
+                    return (self.opaque(), Box::default());
+                };
+                let matcher = self.lower_expr(context, &parsed);
+                alternatives.push(matcher);
+                value_types.push(ValueType::Matcher(matcher));
+            }
+        }
+        (
+            self.intern_union(alternatives),
+            value_types.into_boxed_slice(),
+        )
     }
 
     fn lower_expr(&mut self, context: &FieldContext<'_>, parsed: &Expr) -> MatcherId {
@@ -1370,6 +1442,13 @@ impl<'a> Lowering<'a> {
         let mut alternatives = Vec::with_capacity(parsed.alternatives.len());
         for alternative in &parsed.alternatives {
             alternatives.push(self.lower_primary(context, alternative));
+        }
+        self.intern_union(alternatives)
+    }
+
+    fn intern_union(&mut self, alternatives: Vec<MatcherId>) -> MatcherId {
+        if let [only] = alternatives.as_slice() {
+            return *only;
         }
         self.intern_matcher(Matcher::Union(alternatives.into_boxed_slice()))
     }
@@ -1496,6 +1575,7 @@ impl<'a> Lowering<'a> {
                 },
                 None => Matcher::Opaque,
             },
+            Primary::Alias(_) => unreachable!("aliases expand before lowering"),
         };
         self.intern_matcher(matcher)
     }
@@ -1572,7 +1652,13 @@ impl<'a> Lowering<'a> {
         for part in parts {
             lowered.push(match part {
                 LiteralPart::Text(text) => PatternPart::Text(self.strings.intern_verbatim(text)),
-                LiteralPart::Hole(hole) => PatternPart::Hole(self.lower_expr(context, hole)),
+                LiteralPart::Hole(hole) => {
+                    let matcher = match self.aliases.expand(hole.clone()) {
+                        Ok(parsed) => self.lower_expr(context, &parsed),
+                        Err(_) => self.opaque(),
+                    };
+                    PatternPart::Hole(matcher)
+                }
             });
         }
         lowered.into_boxed_slice()
