@@ -21,6 +21,11 @@ Use [VS Code's generated configuration reference](../../editors/vscode/REFERENCE
 as a guide to shared `paradoxcode` settings, while respecting the server's initialization contract.
 Editor defaults need not equal defaults for an independent LSP client.
 
+On-disk scripts can use UTF-8 with or without a BOM, UTF-16LE or UTF-16BE with
+a BOM, and Windows-1252 as the EU4 fallback. `pdc/formatWorkspace` writes scripts
+back in their original encoding. For open documents, send the editor's decoded
+Unicode text through the standard LSP document notifications.
+
 ## On-demand event and mission previews
 
 A resolved event or mission can add a `pdcPreview` field to a standard hover result. It carries
