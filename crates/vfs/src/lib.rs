@@ -7,11 +7,13 @@
 /// Workspace release version shared by persistent caches and the shipped language server.
 pub const LSP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+mod encoding;
 mod model;
 mod parse_cache;
 pub mod scan;
 mod string_pool;
 
+pub use encoding::DiskSourceEncoding;
 pub use model::localisation_previews_from_parsed;
 pub use model::{
     DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSource,

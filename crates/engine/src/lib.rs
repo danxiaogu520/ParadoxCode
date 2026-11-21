@@ -35,12 +35,12 @@ pub use index::{
 };
 pub use index_cache::{IndexCache, IndexCacheError, IndexCacheMetadata};
 pub use vfs::{
-    DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSource,
-    GlobIncludePatterns, LSP_VERSION, LocalisationPreview, ParseCache, ParseCacheError,
-    ResolvedCandidate, SourceFile, SourceFileId, SourceRoot, SourceRootId, SourceRootKind,
-    StringPool, TextChange, WorkspaceChange, WorkspaceError, WorkspaceScanFilterError,
-    WorkspaceScanFilters, WorkspaceScanIssue, WorkspaceScanIssueKind, WorkspaceScanLimits,
-    WorkspaceScanReport, WorkspaceScanToken, intern_shard_string,
+    DiskFileChange, DiskFileChangeKind, DiskSourceEncoding, DocumentError, DocumentId,
+    DocumentSource, GlobIncludePatterns, LSP_VERSION, LocalisationPreview, ParseCache,
+    ParseCacheError, ResolvedCandidate, SourceFile, SourceFileId, SourceRoot, SourceRootId,
+    SourceRootKind, StringPool, TextChange, WorkspaceChange, WorkspaceError,
+    WorkspaceScanFilterError, WorkspaceScanFilters, WorkspaceScanIssue, WorkspaceScanIssueKind,
+    WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken, intern_shard_string,
 };
 
 #[cfg(test)]

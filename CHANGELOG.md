@@ -28,6 +28,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - EU4 script formatting uses schema-specific list layouts. Mission prerequisites expand from two
   entries, fixed vectors stay on one line, and long province lists wrap in groups.
 
+- The language server reads BOM-marked UTF-16 scripts. Workspace formatting preserves the source
+  encoding, including Windows-1252 and UTF-8 or UTF-16 byte-order marks.
+
 ### Fixed
 
 - EU4 government reform hovers show a single reform reference type. Hovers and completions mark

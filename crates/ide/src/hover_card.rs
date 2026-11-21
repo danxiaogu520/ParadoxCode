@@ -14,6 +14,8 @@
 //! the same positions go-to-definition serves. Positions inside the block
 //! body never card, so logic hovers keep the plain semantic pipeline.
 
+use std::borrow::Cow;
+
 use engine::{AnalysisSnapshot, DocumentId, SourceRootKind};
 use rules::GameProfile;
 use text::{TextRange, TextSize};
@@ -1118,13 +1120,18 @@ fn sprite_asset(
 
 /// Reads the source behind a symbol location: the open document when the
 /// definition lives in one (freshest text), else the indexed disk file.
-/// Vanilla `.gfx` files are not guaranteed UTF-8, and only ASCII path and
-/// number spellings are consumed, so bytes decode lossily.
-fn definition_source(snapshot: &AnalysisSnapshot, location: &Location) -> Option<String> {
+/// Use the scan decoder for disk files so the indexed byte ranges still apply.
+fn definition_source<'a>(
+    snapshot: &'a AnalysisSnapshot,
+    location: &Location,
+) -> Option<Cow<'a, str>> {
     if let Some(document) = location.document.as_ref() {
         return snapshot
             .document(document)
-            .map(|document| document.text().to_owned());
+            .map(|document| Cow::Borrowed(document.text()));
+    }
+    if let Some(source) = location.file.and_then(|id| snapshot.source_text(id)) {
+        return Some(Cow::Borrowed(source));
     }
     let path = if let Some(file) = location
         .file
@@ -1138,19 +1145,17 @@ fn definition_source(snapshot: &AnalysisSnapshot, location: &Location) -> Option
                 .map(|root| root.join(path.as_str()).to_path_buf())
         })
     }?;
-    // Archive tiers surface their members through `<zip>!<entry>` virtual paths,
-    // which plain metadata and read calls cannot serve; route them through the
-    // bounded archive reader instead of the disk fast path.
-    if let Some((zip_path, entry)) = vfs::split_archive_path(&path) {
-        let bytes = vfs::read_archive_entry_bytes(&zip_path, &entry, MAX_DEFINITION_READ_BYTES)?;
-        return Some(String::from_utf8_lossy(&bytes).into_owned());
-    }
-    let metadata = std::fs::metadata(&path).ok()?;
-    if metadata.len() > MAX_DEFINITION_READ_BYTES {
-        return None;
-    }
-    let bytes = std::fs::read(&path).ok()?;
-    Some(String::from_utf8_lossy(&bytes).into_owned())
+    let limits = vfs::WorkspaceScanLimits {
+        max_file_size: MAX_DEFINITION_READ_BYTES,
+        ..snapshot.scan_limits()
+    };
+    vfs::scan::read_source_file(
+        &path,
+        limits,
+        &mut vfs::WorkspaceScanReport::default(),
+        snapshot.game_profile().source_encoding,
+    )
+    .map(Cow::Owned)
 }
 
 /// Extracts `texturefile` and `noOfFrames` assignments from one sprite-block
