@@ -167,8 +167,7 @@ pub fn data() -> serde_json::Value {
     "paradoxcode.hover.eventCard",
     "paradoxcode.diagnostics.severityOverrides",
     "paradoxcode.localisation.preferredLanguages",
-    "paradoxcode.localisation.transparentEncoding",
-    "paradoxcode.localisation.autoOpen",
+    "paradoxcode.localisation.encodingMode",
     "paradoxcode.completion.sourceLayers",
     "paradoxcode.completion.iconPreview",
     "paradoxcode.performance.profile"

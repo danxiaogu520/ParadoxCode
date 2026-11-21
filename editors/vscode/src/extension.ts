@@ -13,6 +13,7 @@ import {
 import { FileTeeDebugChannel } from './debugChannel';
 import { setServerClient } from './serverClient';
 import { LoadedFilesProvider } from './fileExplorer';
+import { localisationSync } from './localisationSync';
 import { SearchPanel } from './searchPanel';
 import { MissionPreviewPanel } from './previewPanel';
 import { MissionIconPickerPanel } from './iconPickerPanel';
@@ -74,7 +75,6 @@ const SERVER_SETTING_KEYS = [
     'vanilla.mode',
     'diagnostics.severityOverrides',
     'localisation.preferredLanguages',
-    'localisation.transparentScriptGlobs',
     'completion.sourceLayers',
     'performance.profile',
     'server.installPolicy',
@@ -287,7 +287,6 @@ function readInitializationOptions(): Record<string, unknown> {
         ['vanilla.mode', 'vanillaMode'],
         ['diagnostics.severityOverrides', 'diagnosticSeverityOverrides'],
         ['localisation.preferredLanguages', 'preferredLocalisationLanguages'],
-        ['localisation.transparentScriptGlobs', 'transparentScriptGlobs'],
         ['completion.sourceLayers', 'completionSourceLayers'],
         ['performance.profile', 'performanceProfile'],
     ];
@@ -666,8 +665,9 @@ function completionSpritePreview(): boolean {
         .get<boolean>('iconPreview', true);
 }
 
-function clientMiddleware(): NonNullable<LanguageClientOptions['middleware']> {
+function clientMiddleware(getClient: () => LanguageClient): NonNullable<LanguageClientOptions['middleware']> {
     return {
+        ...localisationSync(getClient, log),
         provideCompletionItem(document, position, context, token, next) {
             return Promise.resolve(next(document, position, context, token)).then((result) => {
                 if (!result) {
@@ -1094,7 +1094,6 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
             // Decoded views over transcoded files: the provider syncs decoded
             // text under the pdcloc:// scheme; the server resolves these URIs
             // to the backing path (see crates/pdc/src/uri.rs).
-            { scheme: PDCLOC_SCHEME, language: EU4_LANGUAGE_ID },
             { scheme: PDCLOC_SCHEME, language: LOCALISATION_LANGUAGE_ID },
             { pattern: '**/common/achievements.txt' },
             { pattern: '**/common/alerts.txt' },
@@ -1255,7 +1254,7 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
         outputChannel: log,
         traceOutputChannel: debugLog,
         revealOutputChannelOn: RevealOutputChannelOn.Error,
-        middleware: clientMiddleware(),
+        middleware: clientMiddleware(() => languageClient),
     };
     const languageClient = new LanguageClient(
         'paradoxcode',
@@ -1382,7 +1381,7 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
         const currentClient = client;
         // Publish the fresh instance before start() resolves so editor requests can wait
         // for a Running client without capturing an instance from before a restart.
-        setServerClient(currentClient);
+        setServerClient(currentClient, resolution.command);
         currentClient.onDidChangeState((event) => {
             if (client !== currentClient) {
                 return;

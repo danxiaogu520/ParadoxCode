@@ -249,17 +249,20 @@ Glob patterns for files excluded from workspace discovery.
 }
 ```
 
-### `paradoxcode.localisation.autoOpen`
+### `paradoxcode.localisation.encodingMode`
 
-Automatic opening policy for the experimental `pdcloc://` decoded view; applies only when `paradoxcode.localisation.transparentEncoding` is enabled. `needsTranscode` (default): escaped or damaged files, or plain text whose text anywhere in the file a save would encode, enter the decoded view. `always`: every eligible file enters the decoded view. `off`: open the decoded view only by explicit command.
+Encoding management for localisation YML. TXT files support selection conversion from the editor context menu.
 
 ```json
 {
-  "default": "needsTranscode",
+  "default": "automatic",
   "enum": [
-    "needsTranscode",
-    "always",
-    "off"
+    "manual",
+    "automatic"
+  ],
+  "enumDescriptions": [
+    "Convert the YML editor buffer with an undoable edit. Save the document to write the result.",
+    "Edit readable text and write EU4dll bytes on save."
   ],
   "type": "string"
 }
@@ -282,32 +285,16 @@ Localisation language preference. The first entry is the target language: hover 
 
 ### `paradoxcode.localisation.transparentEncoding`
 
-Experimental EU4dll transparent encoding and `pdcloc://` decoded views. Disabled by default. When enabled, eligible files can open in the decoded view and saves encode the entire file automatically, including comments, identifiers and strings. Search and navigation have known limitations. When disabled, use the editor-title Decode File / Encode File buttons for manual disk conversion with a `.pre-transcode.bak` backup. Reload the VS Code window after changing this setting.
+Legacy automatic encoding preference.
 
 ```json
 {
   "default": false,
+  "markdownDeprecationMessage": "Use paradoxcode.localisation.encodingMode.",
   "tags": [
     "experimental"
   ],
   "type": "boolean"
-}
-```
-
-### `paradoxcode.localisation.transparentScriptGlobs`
-
-Workspace-relative script glob patterns for the manual Decode File / Encode File buttons and experimental decoded views (paratranz `latin1eu4` profile). Localisation YML files qualify independently. Default: `**/*.txt`; an empty list limits conversion to localisation YML.
-
-```json
-{
-  "default": [
-    "**/*.txt"
-  ],
-  "items": {
-    "pattern": "^[^\\].*$",
-    "type": "string"
-  },
-  "type": "array"
 }
 ```
 
@@ -540,10 +527,12 @@ Publish diagnostics for closed files in the project during workspace validation 
 | `paradoxcode.toggleDebug` | Toggle Debug Mode |
 | `paradoxcode.openDebugOutput` | Open ParadoxCode Debug Output |
 | `paradoxcode.refreshLoadedFiles` | Refresh Loaded Files |
-| `paradoxcode.localisation.openDecoded` | Open in Decoded (Chinese) View (Experimental) |
+| `paradoxcode.localisation.openDecoded` | Open in Decoded Chinese View |
 | `paradoxcode.localisation.revealOriginal` | Open the Raw Transcoded File |
 | `paradoxcode.localisation.peekOriginal` | Peek at the Raw Transcoded Form |
 | `paradoxcode.localisation.endPeek` | Back to the Decoded View |
-| `paradoxcode.localisation.encodeFile` | Encode Entire File (EU4dll Escape Form) |
-| `paradoxcode.localisation.decodeFile` | Decode Entire File (Readable Text) |
+| `paradoxcode.localisation.encodeFile` | Encode YML Buffer for EU4dll |
+| `paradoxcode.localisation.decodeFile` | Decode YML Buffer to Readable Text |
 | `paradoxcode.openSearch` | Search |
+| `paradoxcode.localisation.encodeSelection` | Convert Selection to Game-Encoded Text |
+| `paradoxcode.localisation.decodeSelection` | Convert Selection to Readable Chinese Text |
