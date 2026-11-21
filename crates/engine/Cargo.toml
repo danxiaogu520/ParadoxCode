@@ -6,7 +6,6 @@ license.workspace = true
 rust-version.workspace = true
 description = "Analysis host, immutable snapshots, and query caching for ParadoxCode."
 authors.workspace = true
-homepage.workspace = true
 repository.workspace = true
 readme.workspace = true
 publish = false
