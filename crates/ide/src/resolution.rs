@@ -136,6 +136,20 @@ fn semantic_data_with_cancellation_uncached(
     }
     for reference in hir.references() {
         cancellation.checkpoint()?;
+        if reference.origin == hir::HirReferenceOrigin::OptionalLocalisation
+            && !snapshot
+                .ir()
+                .type_by_name("localisation")
+                .is_some_and(|ty| {
+                    rules::ir::SymbolFacts::type_member(
+                        &crate::ir_queries::SnapshotSymbolFacts { snapshot },
+                        ty,
+                        &reference.name,
+                    )
+                })
+        {
+            continue;
+        }
         if !ir_reference_is_template(snapshot, hir, reference) {
             continue;
         }

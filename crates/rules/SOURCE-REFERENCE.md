@@ -32,6 +32,7 @@ One type implementation binding: a localisation-key or sprite-name template.
 | `loc` | no | `null` | `{"type":["string","null"]}` | Localisation-key template (`$` stands for the instance name). |
 | `required` | no | `null` | `{"type":["boolean","null"]}` | Whether the bound symbol must resolve. |
 | `sprite` | no | `null` | `{"type":["string","null"]}` | Sprite-name template. |
+| `strip_prefix` | no | — | `{"type":["string","null"]}` | Remove this leading affix from the instance name before expanding the template. |
 
 ## BlockForm
 
@@ -49,6 +50,7 @@ The full description of one block.
 
 | Field | Required | Source default | Shape | Meaning |
 | --- | --- | --- | --- | --- |
+| `field_key_loc` | no | — | `{"type":["string","null"]}` | Optional localisation template for its own exact keys. `$` preserves the spelling and `${upper}` uppercases it. |
 | `fields` | no | `{}` | `{"additionalProperties":{"$ref":"#/$defs/FieldOverloads"},"type":"object"}` | Exact keys, hash lookup. |
 | `forms` | no | — | `{"items":{"$ref":"#/$defs/BlockForm"},"type":"array"}` | Alternative combinations of direct-field occurrence bounds. At least one complete form must match; ordinary field bounds still apply. |
 | `include` | no | `[]` | `{"items":{"type":"string"},"type":"array"}` | Mixin names, expanded at compile time. |
@@ -146,14 +148,14 @@ Defines a symbol instance at the field's position.
 
 | Field | Required | Source default | Shape | Meaning |
 | --- | --- | --- | --- | --- |
-| `name` | no | `null` | `{"type":["string","null"]}` | Instance-name source: `"key"` (default), `"field:<name>"`, or `"file"`. |
+| `name` | no | `null` | `{"type":["string","null"]}` | Instance-name source: `key`, `field:<name>`, `file`, or `ordinal:<root field>:<separator>`. |
 | `strip_prefix` | no | `null` | `{"type":["string","null"]}` | Prefix removed from the derived instance name. |
 | `strip_suffix` | no | `null` | `{"type":["string","null"]}` | Suffix removed from the derived instance name. |
 | `type` | yes | — | `{"type":"string"}` | Type name, optionally with the subtype granted at this position (`"event.country"`). |
 
 ## EnumSpec
 
-An enum is a list of literal member names.
+Literal enum members, optionally paired with named localisation templates for display.
 
 ```json
 {
@@ -164,9 +166,13 @@ An enum is a list of literal member names.
         "type": "string"
       },
       "type": "array"
+    },
+    {
+      "$ref": "#/$defs/LocalisedEnumSpec",
+      "description": "An enum with optional display bindings for its members."
     }
   ],
-  "description": "An enum is a list of literal member names."
+  "description": "Literal enum members, optionally paired with named localisation templates for display."
 }
 ```
 
@@ -304,6 +310,15 @@ One scope link.
 | `from` | yes | — | `{"items":{"type":"string"},"type":"array"}` | Scopes the link may start from (`"any"` allowed). |
 | `to` | yes | — | `{"type":"string"}` | Scope the link lands in (`"any"` allowed). |
 
+## LocalisedEnumSpec
+
+Localised enum members keep normal enum validation and completion.
+
+| Field | Required | Source default | Shape | Meaning |
+| --- | --- | --- | --- | --- |
+| `localisation` | yes | — | `{"additionalProperties":{"type":"string"},"type":"object"}` | Display labels mapped to localisation-key templates. |
+| `members` | yes | — | `{"items":{"type":"string"},"type":"array"}` | The accepted member spellings. |
+
 ## MapSpec
 
 A homogeneous map block: same key and value shapes for every entry.
@@ -320,6 +335,7 @@ A mixin: a pure structural field bundle.
 
 | Field | Required | Source default | Shape | Meaning |
 | --- | --- | --- | --- | --- |
+| `field_key_loc` | no | — | `{"type":["string","null"]}` | Localisation template for the exact keys contributed by this mixin. |
 | `fields` | no | `{}` | `{"additionalProperties":{"$ref":"#/$defs/FieldOverloads"},"type":"object"}` | Field specs contributed to every including schema. |
 
 ## RegisterRole

@@ -1,0 +1,86 @@
+{
+  "files": {
+    "game_hints": {
+      "ext": "txt",
+      "path": "hints",
+      "root": "hints_file"
+    },
+    "tutorial_chapters": {
+      "ext": "txt",
+      "path": "tutorial",
+      "root": "tutorial_file"
+    }
+  },
+  "schemas": {
+    "hint_body": {
+      "fields": {
+        "text": {
+          "card": "0..*",
+          "value": "ref<localisation> | scalar"
+        },
+        "title": {
+          "card": "0..*",
+          "value": "ref<localisation> | scalar"
+        }
+      },
+      "open": true
+    },
+    "hints_file": {
+      "open": true,
+      "patterns": [
+        {
+          "body": "hint_body",
+          "card": "0..*",
+          "key": "scalar"
+        }
+      ]
+    },
+    "tutorial_chapter": {
+      "fields": {
+        "buttonText": {
+          "card": "0..1",
+          "value": "loc"
+        },
+        "desc": {
+          "card": "0..1",
+          "value": "loc"
+        },
+        "page": {
+          "body": "tutorial_page",
+          "card": "0..*"
+        },
+        "title": {
+          "card": "0..1",
+          "value": "loc"
+        }
+      },
+      "open": true
+    },
+    "tutorial_file": {
+      "fields": {
+        "tutorial": {
+          "body": "tutorial_chapter",
+          "card": "0..*"
+        }
+      },
+      "open": true
+    },
+    "tutorial_page": {
+      "fields": {
+        "object": {
+          "card": "0..1",
+          "value": "loc"
+        },
+        "text": {
+          "card": "0..1",
+          "value": "loc"
+        },
+        "title": {
+          "card": "0..1",
+          "value": "loc"
+        }
+      },
+      "open": true
+    }
+  }
+}

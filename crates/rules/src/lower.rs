@@ -309,6 +309,7 @@ enum DraftKey<'d> {
 
 /// One field specification about to be lowered.
 struct FieldDraft<'d> {
+    key_loc: Option<String>,
     spec: &'d FieldSpec,
     key: DraftKey<'d>,
     at: At,
@@ -322,6 +323,7 @@ struct FieldDraft<'d> {
 /// provenance and are *not* merged.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct FieldKey {
+    key_loc: Option<Symbol>,
     key: MatcherId,
     value: FieldValue,
     card: Card,
@@ -571,6 +573,10 @@ impl<'a> Lowering<'a> {
             .as_deref()
             .map(|text| self.strings.intern_verbatim(text));
         Binding {
+            strip_prefix: spec
+                .strip_prefix
+                .as_deref()
+                .map(|s| self.strings.intern_verbatim(s)),
             loc,
             sprite,
             required: spec.required.unwrap_or(false),
@@ -578,8 +584,21 @@ impl<'a> Lowering<'a> {
     }
 
     fn enum_info(&mut self, name: Symbol, spec: &EnumSpec) -> EnumInfo {
-        let EnumSpec::Members(members) = spec;
-        let rows = members
+        let localisation = match spec {
+            EnumSpec::Members(_) => Box::default(),
+            EnumSpec::Localised(spec) => spec
+                .localisation
+                .iter()
+                .map(|(label, template)| {
+                    (
+                        self.strings.intern_verbatim(label),
+                        self.strings.intern_verbatim(template),
+                    )
+                })
+                .collect(),
+        };
+        let rows = spec
+            .members()
             .iter()
             .map(|member| EnumRow {
                 name: self.strings.intern_folded(member),
@@ -587,6 +606,7 @@ impl<'a> Lowering<'a> {
             })
             .collect::<Vec<_>>();
         EnumInfo {
+            localisation,
             name,
             rows: rows.into_boxed_slice(),
         }
@@ -966,28 +986,41 @@ impl<'a> Lowering<'a> {
         block: &crate::source::BlockSchema,
         at: &At,
     ) -> FxHashMap<Symbol, Box<[FieldId]>> {
-        let mut merged: Vec<(String, &FieldOverloads, At)> = Vec::new();
+        let mut merged = Vec::new();
         for mixin_name in &block.include {
             let symbol = self.strings.intern_folded(mixin_name);
             let Some((mixin, mixin_at)) = self.mixins.get(&symbol).cloned() else {
                 continue;
             };
             for (key, overloads) in &mixin.fields {
-                merged.push((key.clone(), overloads, mixin_at.child("fields").child(key)));
+                merged.push((
+                    key.clone(),
+                    overloads,
+                    mixin_at.child("fields").child(key),
+                    mixin.field_key_loc.as_deref(),
+                ));
             }
         }
         for (key, overloads) in &block.fields {
             let position = merged
                 .iter()
-                .position(|(existing, _, _)| existing.eq_ignore_ascii_case(key));
-            let entry = (key.clone(), overloads, at.child("fields").child(key));
+                .position(|(existing, _, _, _)| existing.eq_ignore_ascii_case(key));
+            let entry = (
+                key.clone(),
+                overloads,
+                at.child("fields").child(key),
+                block
+                    .field_key_loc
+                    .as_deref()
+                    .or_else(|| position.and_then(|i| merged[i].3)),
+            );
             match position {
                 Some(index) => merged[index] = entry,
                 None => merged.push(entry),
             }
         }
         let mut exact: FxHashMap<Symbol, Box<[FieldId]>> = FxHashMap::default();
-        for (key, overloads, key_at) in merged {
+        for (key, overloads, key_at, template) in merged {
             let symbol = self.strings.intern_folded(&key);
             let list: &[FieldSpec] = match overloads {
                 FieldOverloads::One(field) => std::slice::from_ref(field.as_ref()),
@@ -1001,6 +1034,7 @@ impl<'a> Lowering<'a> {
                 }
                 let draft = FieldDraft {
                     spec,
+                    key_loc: template.map(|pattern| crate::ir::expand_key_template(pattern, &key)),
                     key: DraftKey::Exact(&key),
                     at: spec_at,
                 };
@@ -1016,6 +1050,7 @@ impl<'a> Lowering<'a> {
         let raw_key = spec.key.as_deref().expect("checked pattern key");
         let draft = FieldDraft {
             spec,
+            key_loc: None,
             key: DraftKey::Expression(raw_key),
             at: at.clone(),
         };
@@ -1110,6 +1145,10 @@ impl<'a> Lowering<'a> {
             .as_deref()
             .map(|doc| self.strings.intern_verbatim(doc));
         let field = Field {
+            key_loc: draft
+                .key_loc
+                .as_deref()
+                .map(|s| self.strings.intern_verbatim(s)),
             key,
             value,
             card: card(&spec.card),
@@ -1127,6 +1166,7 @@ impl<'a> Lowering<'a> {
         };
         let pointer = self.strings.intern_verbatim(&draft.at.pointer);
         let fingerprint = FieldKey {
+            key_loc: field.key_loc,
             key: field.key,
             value: field.value,
             card: field.card,
@@ -1233,6 +1273,14 @@ impl<'a> Lowering<'a> {
         let name = match source.name.as_deref().map(str::trim) {
             None | Some("key") => DefName::Key,
             Some("file") => DefName::File,
+            Some(other)
+                if let Some((field, separator)) = crate::compile::ordinal_name_parts(other) =>
+            {
+                DefName::Ordinal {
+                    field: self.strings.intern_folded(field),
+                    separator: self.strings.intern_verbatim(separator),
+                }
+            }
             Some(other) => match other.strip_prefix("field:") {
                 Some(field) => DefName::Field(self.strings.intern_folded(field.trim())),
                 None => DefName::Key,
@@ -2204,7 +2252,11 @@ mod tests {
 
         assert_eq!(
             ir.files.len(),
-            138,
+            sources
+                .files
+                .iter()
+                .map(|(_, file)| file.files.len())
+                .sum::<usize>(),
             "every `files` entry survives, including the dedicated .gfx rule"
         );
         let (_, gfx) = ir

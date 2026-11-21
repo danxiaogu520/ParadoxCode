@@ -1631,6 +1631,7 @@
           "body": "technology_body",
           "card": "0..*",
           "def": {
+            "name": "ordinal:monarch_power:_tech_cs_",
             "type": "technology"
           }
         }
@@ -1780,13 +1781,17 @@
       ]
     },
     "customizable_localization_file": {
-      "patterns": [
-        {
+      "fields": {
+        "defined_text": {
           "body": "defined_text_body",
           "card": "0..*",
-          "key": "def<defined_text>"
+          "def": {
+            "name": "field:name",
+            "type": "defined_text"
+          }
         }
-      ]
+      },
+      "open": true
     },
     "decision_file__country_decisions": {
       "patterns": [

@@ -92,7 +92,7 @@
         {
           "body": "alert_definition",
           "card": "0..*",
-          "key": "scalar"
+          "key": "def<alert>"
         }
       ]
     },

@@ -24,7 +24,7 @@
       "fields": {
         "localisation_key": {
           "card": "1",
-          "value": "scalar"
+          "value": "ref<localisation> | scalar"
         },
         "trigger": {
           "body": "trigger",

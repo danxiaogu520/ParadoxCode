@@ -489,7 +489,8 @@ pub fn execute(mode: &str, arguments: &[String]) -> Result<String, String> {
             .into_iter()
             .filter(|p| {
                 p.extension().and_then(|e| e.to_str()).is_some_and(|e| {
-                    ["txt", "gfx", "yml", "yaml"].contains(&e.to_ascii_lowercase().as_str())
+                    ["txt", "gfx", "asset", "yml", "yaml"]
+                        .contains(&e.to_ascii_lowercase().as_str())
                 })
             })
             .collect::<Vec<_>>();

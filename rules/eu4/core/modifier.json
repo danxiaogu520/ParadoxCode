@@ -1,6 +1,7 @@
 {
   "mixins": {
     "keys__modifier": {
+      "field_key_loc": "MODIFIER_${upper}",
       "fields": {
         "MAY_conditional_loyalty": {
           "card": "0..1",
@@ -7004,6 +7005,7 @@
   },
   "schemas": {
     "modifier": {
+      "field_key_loc": "MODIFIER_${upper}",
       "fields": {
         "MAY_conditional_loyalty": {
           "card": "0..1",

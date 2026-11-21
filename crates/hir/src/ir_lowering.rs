@@ -164,8 +164,11 @@ pub(super) fn lower(
     let Some((_, file)) = ir.file_rule(path) else {
         return out;
     };
-    if matches!(file.root, RootRule::Schema(_)) {
-        out.root_memo = facts.and_then(roots::for_facts);
+    if let RootRule::Schema(schema) = file.root
+        && let Some(memo) = facts.and_then(roots::for_facts)
+        && !uses_ordinal_names(ir, schema)
+    {
+        out.root_memo = Some(memo);
     }
     let roots: Vec<(SchemaId, Vec<usize>, SubtypeSet, ScopeState)> = match &file.root {
         RootRule::Schema(schema) => vec![(
@@ -349,7 +352,7 @@ pub(super) fn lower_schema_fragment(
     let children = crate::scope::property_children(props);
     let root_range = root_range.unwrap_or(syntax.root().range());
     let mut out = IrFacts {
-        prefix_memo,
+        prefix_memo: prefix_memo.filter(|_| !uses_ordinal_names(ir, schema)),
         root_memo: None,
         fork_generation: 0,
         query_context: Default::default(),
@@ -1662,6 +1665,15 @@ fn link_from_matches(
         }),
     })
 }
+fn uses_ordinal_names(ir: &RulesIr, schema: SchemaId) -> bool {
+    ir.fields(schema).into_iter().any(|id| {
+        matches!(
+            ir.field(id).def.as_ref().map(|def| def.name),
+            Some(DefName::Ordinal { .. })
+        )
+    })
+}
+
 fn instance_name(
     ir: &RulesIr,
     def: &rules::ir::DefSpec,
@@ -1680,6 +1692,30 @@ fn instance_name(
                 None
             }
         }),
+        DefName::Ordinal { field, separator } => {
+            let p = property.filter(|p| p.top_level && p.scalar.is_none())?;
+            let discriminator = props
+                .iter()
+                .find(|other| {
+                    other.top_level && other.key.eq_ignore_ascii_case(ir.strings().resolve(field))
+                })?
+                .scalar
+                .as_ref()?;
+            let ordinal = props
+                .iter()
+                .take_while(|other| other.key_range.start() < p.key_range.start())
+                .filter(|other| {
+                    other.top_level
+                        && other.scalar.is_none()
+                        && other.key.eq_ignore_ascii_case(&p.key)
+                })
+                .count();
+            Some(format!(
+                "{}{}{ordinal}",
+                discriminator.value.to_ascii_lowercase(),
+                ir.strings().resolve(separator)
+            ))
+        }
         DefName::File => path
             .as_str()
             .rsplit('/')
@@ -1729,6 +1765,7 @@ fn definition_selection(
                     .flatten()
             })
             .unwrap_or(fallback),
+        DefName::Ordinal { .. } => fallback,
         DefName::File => TextRange::new(0, 0).unwrap_or(fallback),
     }
 }
@@ -1938,6 +1975,34 @@ fn collect_matcher_refs_with_definitions(
             subtype_names(ir, *type_id, *subtype),
         ),
         Matcher::Union(items) => {
+            // Keep possible weak references in disk shards even when their translation is
+            // supplied later by a different root. Navigation resolves them against its snapshot.
+            if items.len() == 2
+                && items
+                    .iter()
+                    .any(|id| matches!(ir.matcher(*id), Matcher::Scalar))
+                && items.iter().any(|id| {
+                    matches!(ir.matcher(*id), Matcher::Ref(RefTarget::Type {
+                    type_id, subtype: None, strip_prefix: None,
+                }) if ir.strings().resolve(ir.type_info(*type_id).name) == "localisation")
+                })
+            {
+                if !value.is_empty()
+                    && value.parse::<f64>().is_err()
+                    && value.bytes().all(|b| {
+                        b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.' | b'$')
+                    })
+                {
+                    out.references.push(HirReference {
+                        kind: "localisation".into(),
+                        name: value.to_owned(),
+                        range,
+                        origin: HirReferenceOrigin::OptionalLocalisation,
+                        subtype: None,
+                    });
+                }
+                return;
+            }
             let alternatives = items.to_vec();
             let definite = alternatives
                 .iter()
@@ -2349,7 +2414,7 @@ fn add_bindings(ir: &RulesIr, ty: TypeId, name: &str, range: TextRange, out: &mu
                     let Some(template) = template else { continue };
                     let reference = HirReference {
                         kind: kind.into(),
-                        name: ir.strings().resolve(template).replace('$', name),
+                        name: binding.expand(ir.strings(), template, name),
                         range,
                         origin: if kind == "sprite" {
                             HirReferenceOrigin::DerivedSprite

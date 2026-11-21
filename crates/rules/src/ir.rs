@@ -360,6 +360,9 @@ pub struct BlockForm {
 /// One field specification.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Field {
+    /// Effective localisation key for this exact rule field, when declared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_loc: Option<Symbol>,
     /// The key matcher.
     pub key: MatcherId,
     /// What the value is.
@@ -447,6 +450,8 @@ pub enum DefName {
     Field(Symbol),
     /// The file name without its extension.
     File,
+    /// Lowercase root field value, separator, and the zero-based ordinal of the block.
+    Ordinal { field: Symbol, separator: Symbol },
 }
 
 /// The control-flow primitive attached to a field.
@@ -603,12 +608,50 @@ pub enum TraitArgument {
 /// instance name.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Binding {
+    /// Affix removed before the instance name is substituted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip_prefix: Option<Symbol>,
     /// Localisation-key template; `$` is the instance name.
     pub loc: Option<Symbol>,
     /// Sprite-name template; `$` is the instance name.
     pub sprite: Option<Symbol>,
     /// Whether the bound symbol must resolve.
     pub required: bool,
+}
+
+impl Binding {
+    /// Expand a binding with the same affix rules for indexing and presentation.
+    pub fn expand(&self, strings: &Interner, template: Symbol, instance: &str) -> String {
+        let name = self
+            .strip_prefix
+            .and_then(|prefix| {
+                let prefix = strings.resolve(prefix);
+                instance
+                    .get(..prefix.len())
+                    .filter(|head| head.eq_ignore_ascii_case(prefix))
+                    .map(|_| &instance[prefix.len()..])
+            })
+            .unwrap_or(instance);
+        expand_key_template(strings.resolve(template), name)
+    }
+}
+
+/// Substitute the exact or uppercase name without re-expanding the replacement text.
+pub fn expand_key_template(template: &str, name: &str) -> String {
+    let mut result = String::with_capacity(template.len() + name.len());
+    let mut rest = template;
+    while let Some((literal, tail)) = rest.split_once('$') {
+        result.push_str(literal);
+        if let Some(after) = tail.strip_prefix("{upper}") {
+            result.push_str(&name.to_ascii_uppercase());
+            rest = after;
+        } else {
+            result.push_str(name);
+            rest = tail;
+        }
+    }
+    result.push_str(rest);
+    result
 }
 
 /// One trait definition.
@@ -621,6 +664,9 @@ pub struct TraitInfo {
 /// One enum.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EnumInfo {
+    /// Label and localisation-key template pairs for member previews.
+    #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
+    pub localisation: Box<[(Symbol, Symbol)]>,
     /// The enum name, folded.
     pub name: Symbol,
     /// Rows, sorted by row name.
@@ -1344,10 +1390,9 @@ impl RulesIr {
                     return None;
                 }
                 match argument {
-                    TraitArgument::Binding(Binding {
-                        loc: Some(template),
-                        ..
-                    }) => Some(self.strings.resolve(*template).replace('$', instance)),
+                    TraitArgument::Binding(binding) => binding
+                        .loc
+                        .map(|template| binding.expand(&self.strings, template, instance)),
                     _ => None,
                 }
             })
@@ -1640,6 +1685,65 @@ impl RulesIr {
             return false;
         };
         info.row(symbol).is_some()
+    }
+
+    /// Optional display keys contributed by an exact field or a matched enum member.
+    pub fn field_localisation_keys(
+        &self,
+        id: FieldId,
+        is_key: bool,
+        spelling: &str,
+    ) -> Vec<(Option<&str>, String)> {
+        let field = self.field(id);
+        let matcher = if is_key {
+            if let Some(key) = field.key_loc {
+                return vec![(None, self.strings.resolve(key).to_owned())];
+            }
+            field.key
+        } else if let FieldValue::Scalar(matcher) = field.value {
+            matcher
+        } else {
+            return Vec::new();
+        };
+        let mut keys = Vec::new();
+        self.enum_localisation_keys(matcher, spelling, &mut keys);
+        keys
+    }
+
+    fn enum_localisation_keys<'a>(
+        &'a self,
+        matcher: MatcherId,
+        spelling: &str,
+        keys: &mut Vec<(Option<&'a str>, String)>,
+    ) {
+        match self.matcher(matcher) {
+            Matcher::Enum { id } => {
+                let info = self.enum_info(*id);
+                if info.localisation.is_empty() {
+                    return;
+                }
+                let Some(row) = self
+                    .strings
+                    .lookup_folded(spelling)
+                    .and_then(|symbol| info.row(symbol))
+                else {
+                    return;
+                };
+                let member = self.strings.resolve(info.rows[row].spelling);
+                keys.extend(info.localisation.iter().map(|(label, template)| {
+                    (
+                        Some(self.strings.resolve(*label)),
+                        expand_key_template(self.strings.resolve(*template), member),
+                    )
+                }));
+            }
+            Matcher::Union(items) => {
+                for item in items {
+                    self.enum_localisation_keys(*item, spelling, keys);
+                }
+            }
+            _ => {}
+        }
     }
 
     /// Whether an actual scope satisfies an expected scope, including declared overrides.

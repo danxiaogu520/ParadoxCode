@@ -601,7 +601,7 @@ fn collect_generated_preview_rows(
                     && let Some(template) = binding.loc
                 {
                     cancellation.checkpoint()?;
-                    let name = ir.strings.resolve(template).replace('$', symbol_name);
+                    let name = binding.expand(ir.strings(), template, symbol_name);
                     let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
                     push_preview_rows(
                         rows,
@@ -670,9 +670,8 @@ fn generated_key_field<'a>(
                             return None;
                         };
                         let template = binding.loc?;
-                        ir.strings
-                            .resolve(template)
-                            .replace('$', symbol_name)
+                        binding
+                            .expand(ir.strings(), template, symbol_name)
                             .eq_ignore_ascii_case(key)
                             .then(|| ir.strings.resolve(*label))
                     })

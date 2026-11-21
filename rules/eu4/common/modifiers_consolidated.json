@@ -1,6 +1,7 @@
 {
   "schemas": {
     "event_modifier_body": {
+      "field_key_loc": "MODIFIER_${upper}",
       "fields": {
         "MAY_conditional_loyalty": {
           "card": "0..1",

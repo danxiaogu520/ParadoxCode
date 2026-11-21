@@ -84,9 +84,10 @@ pub fn check(root: &Path) -> Result<Vec<String>, String> {
             &mut errors,
         );
         require(
-            ![".yml", ".yaml", ".asset", ".sfx"]
-                .iter()
-                .any(|s| pattern.to_lowercase().contains(s)),
+            pattern == "**/music/*.asset"
+                || ![".yml", ".yaml", ".asset", ".sfx"]
+                    .iter()
+                    .any(|s| pattern.to_lowercase().contains(s)),
             format!("script language claims another parser zone: {pattern}"),
             &mut errors,
         );

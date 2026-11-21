@@ -314,11 +314,20 @@ pub(crate) fn analyze_input_with_cancellation(
     // across all languages: a key that only exists in another language renders as its
     // raw spelling in-game and is reported. One batched resolution serves every
     // localisation reference below.
+    let optional_localisation: std::collections::HashSet<_> = input
+        .hir
+        .iter()
+        .flat_map(|hir| hir.references())
+        .filter(|reference| reference.origin == hir::HirReferenceOrigin::OptionalLocalisation)
+        .map(|reference| reference.range)
+        .collect();
     let mut localisation_keys = semantic
         .references
         .iter()
         .filter(|reference| {
-            reference.kind.eq_ignore_ascii_case("localisation") && !reference.name.contains('$')
+            reference.kind.eq_ignore_ascii_case("localisation")
+                && !reference.name.contains('$')
+                && !optional_localisation.contains(&reference.range)
         })
         .map(|reference| reference.name.as_str())
         .collect::<Vec<_>>();
@@ -334,7 +343,9 @@ pub(crate) fn analyze_input_with_cancellation(
         if reference.kind.eq_ignore_ascii_case("localisation") {
             // Scalar arguments inside a dynamic definition invocation are untyped
             // parameter values, not localisation key references.
-            if localisation_reference_is_dynamic_argument(snapshot, input, reference.range) {
+            if optional_localisation.contains(&reference.range)
+                || localisation_reference_is_dynamic_argument(snapshot, input, reference.range)
+            {
                 continue;
             }
             if !localisation_target_values.contains_key(&reference.name) {

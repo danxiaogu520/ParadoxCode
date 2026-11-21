@@ -344,7 +344,7 @@
         "aspects_name": {
           "card": "0..1",
           "override": true,
-          "value": "scalar"
+          "value": "def<religious_aspects_loc>"
         },
         "authority": {
           "card": "0..1",

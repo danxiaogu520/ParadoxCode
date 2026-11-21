@@ -991,12 +991,8 @@ impl<'a> Checker<'a> {
                     at: at.clone(),
                 },
             );
-            match spec {
-                EnumSpec::Members(members) => {
-                    for (index, member) in members.iter().enumerate() {
-                        self.forbid_params(&at.index(index), member, "an enum member");
-                    }
-                }
+            for (index, member) in spec.members().iter().enumerate() {
+                self.forbid_params(&at.index(index), member, "an enum member");
             }
         }
     }
@@ -2128,10 +2124,21 @@ pub(crate) fn parse_card(raw: &str) -> Result<(u32, Option<u32>), String> {
     Ok((min, max))
 }
 
-/// Parses `key`, `field:<name>`, `file`.
+/// Extract the root discriminator and separator for zero-based repeated block names.
+pub(crate) fn ordinal_name_parts(raw: &str) -> Option<(&str, &str)> {
+    let (field, separator) = raw.strip_prefix("ordinal:")?.split_once(':')?;
+    (is_ident(field)
+        && !separator.is_empty()
+        && separator
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_'))
+    .then_some((field, separator))
+}
+
+/// Checks the supported definition name sources.
 pub(crate) fn parse_def_name(raw: &str) -> Result<(), String> {
     let raw = raw.trim();
-    if raw == "key" || raw == "file" {
+    if raw == "key" || raw == "file" || ordinal_name_parts(raw).is_some() {
         return Ok(());
     }
     if let Some(field) = raw.strip_prefix("field:")
