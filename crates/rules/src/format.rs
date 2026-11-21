@@ -55,6 +55,7 @@ pub fn render(source: &RuleFile, expanded: bool) -> Result<String, serde_json::E
                 spec,
                 expanded,
                 &[
+                    ("field_key_loc", Value::Null),
                     ("include", json!([])),
                     ("fields", json!({})),
                     ("patterns", json!([])),
@@ -71,7 +72,11 @@ pub fn render(source: &RuleFile, expanded: bool) -> Result<String, serde_json::E
         .flat_map(|m| m.values_mut())
     {
         fields(&mut spec["fields"], expanded);
-        defaults(spec, expanded, &[("fields", json!({}))]);
+        defaults(
+            spec,
+            expanded,
+            &[("fields", json!({})), ("field_key_loc", Value::Null)],
+        );
     }
     for spec in value["types"]
         .as_object_mut()
@@ -95,6 +100,7 @@ pub fn render(source: &RuleFile, expanded: bool) -> Result<String, serde_json::E
                         &[
                             ("loc", Value::Null),
                             ("sprite", Value::Null),
+                            ("strip_prefix", Value::Null),
                             ("required", json!(false)),
                         ],
                     );

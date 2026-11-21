@@ -300,6 +300,226 @@ fn ir_all_localisation_bindings_are_visible_without_name_or_field_gates() {
 }
 
 #[test]
+fn rule_localisation_previews_and_definition_targets_follow_the_matched_field() {
+    let mut host = host();
+    let loc = open(
+        &mut host,
+        "localisation/display_l_english.yml",
+        "l_english:\n MODIFIER_DISCIPLINE:0 \"Discipline label\"\n attitude_friendly:0 \"Friendly label\"\n attitude_friendly_desc:0 \"Friendly description\"\n attitude_friendly_DIPLO_ATTITUDE_TT:0 \"Friendly tooltip\"\n",
+    );
+    for (path, source, word, labels) in [
+        (
+            "common/event_modifiers/labels.txt",
+            "sample = { discipline = 0.1 }",
+            "discipline",
+            &["Discipline label"][..],
+        ),
+        (
+            "common/scripted_triggers/labels.txt",
+            "sample = { ai_attitude = { who = ROOT attitude = attitude_friendly } }",
+            "attitude_friendly",
+            &["Friendly label", "Friendly description", "Friendly tooltip"][..],
+        ),
+    ] {
+        let id = open(&mut host, path, source);
+        let snapshot = host.snapshot();
+        let position = source.find(word).unwrap() as u32 + 1;
+        let model = hover(&snapshot, &id, position).unwrap();
+        for label in labels {
+            assert!(model.contents.contains(label), "{}", model.contents);
+        }
+        let targets = definition(&snapshot, &id, position);
+        assert_eq!(targets.len(), labels.len(), "{targets:?}");
+        assert!(
+            targets
+                .iter()
+                .all(|target| target.document.as_ref() == Some(&loc))
+        );
+    }
+}
+
+#[test]
+fn rule_localisation_branches_use_function_names_and_resolvable_keys() {
+    let mut host = host();
+    let loc = open(
+        &mut host,
+        "localisation/branches_l_french.yml",
+        "l_french:\n test_branch:0 \"Branche\"\n",
+    );
+    let source = "defined_text = { name = GetSample text = { localisation_key = test_branch } text = { localisation_key = later_translation } text = { localisation_key = \"[Root.GetName]\" } text = { localisation_key = \"5.0\" } text = { localisation_key = \"\" } }";
+    let id = open(&mut host, "customizable_localization/branches.txt", source);
+    let snapshot = host.snapshot();
+    assert!(
+        crate::scripted_localisation_names(&snapshot)
+            .iter()
+            .any(|name| name == "GetSample")
+    );
+    let hir = snapshot.document(&id).unwrap().hir().unwrap();
+    let references = hir
+        .references()
+        .iter()
+        .filter(|r| r.kind.as_ref() == "localisation")
+        .map(|r| r.name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(references.len(), 2);
+    assert!(references.contains(&"test_branch") && references.contains(&"later_translation"));
+    let targets = definition(
+        &snapshot,
+        &id,
+        source.find("test_branch").unwrap() as u32 + 1,
+    );
+    assert!(
+        targets
+            .iter()
+            .any(|target| target.document.as_ref() == Some(&loc)),
+        "{targets:?}"
+    );
+    assert!(
+        !diagnostics(&snapshot, &id)
+            .iter()
+            .any(|d| d.code == DiagnosticCode::UnknownLocalisationKey)
+    );
+    let later = source.find("later_translation").unwrap() as u32 + 1;
+    assert!(definition(&snapshot, &id, later).is_empty());
+    let added = open(
+        &mut host,
+        "localisation/extra_l_english.yml",
+        "l_english:\n later_translation:0 \"Added later\"\n",
+    );
+    assert!(
+        definition(&host.snapshot(), &id, later)
+            .iter()
+            .any(|target| target.document.as_ref() == Some(&added))
+    );
+}
+
+#[test]
+fn rule_localisation_uses_technology_series_and_estate_stems() {
+    let mut host = host();
+    let ir = game::eu4::first_party_ir().unwrap();
+    assert_eq!(
+        ir.localisation_template_key("estate", "loyalty_modifier", "estate_example")
+            .as_deref(),
+        Some("example_loyalty_modifier")
+    );
+    let id = open(
+        &mut host,
+        "common/technologies/renamed.txt",
+        "technology = {} ahead_of_time = {} technology = {} monarch_power = DIP",
+    );
+    let snapshot = host.snapshot();
+    let hir = snapshot.document(&id).unwrap().hir().unwrap();
+    let names = hir
+        .definitions()
+        .iter()
+        .filter(|d| d.kind.as_ref() == "technology")
+        .map(|d| d.name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(names, ["dip_tech_cs_0", "dip_tech_cs_1"]);
+    for key in [
+        "dip_tech_cs_0_name",
+        "dip_tech_cs_0_desc",
+        "dip_tech_cs_1_name",
+        "dip_tech_cs_1_desc",
+    ] {
+        assert!(
+            hir.references()
+                .iter()
+                .any(|r| r.kind.as_ref() == "localisation" && r.name == key)
+        );
+    }
+    assert!(crate::prepare_rename(&snapshot, &id, 1).is_err());
+    host.apply_document_changes(
+        &id,
+        2,
+        &[vfs::TextChange::full(
+            "technology = {} technology = {} technology = {} monarch_power = MIL",
+        )],
+    )
+    .unwrap();
+    let updated = host.snapshot();
+    let file = updated.document(&id).unwrap().hir().unwrap();
+    assert!(file.definitions().iter().any(|d| d.name == "mil_tech_cs_2"));
+    assert!(
+        !file
+            .definitions()
+            .iter()
+            .any(|d| d.name.starts_with("dip_"))
+    );
+}
+
+#[test]
+fn rule_localisation_connects_music_files_and_resolves_shared_field_prefixes() {
+    let mut host = host();
+    let album = open(
+        &mut host,
+        "music/test.asset",
+        "music = { name = \"test_track\" file = \"track.ogg\" }",
+    );
+    let list = open(&mut host, "music/songs.txt", "song = { name = test_track }");
+    open(
+        &mut host,
+        "localisation/labels_l_english.yml",
+        "l_english:\n test_track:0 \"Track name\"\n family_short:0 \"Short name\"\n family_full:0 \"Full name\"\n popup_instant:0 \"Alert heading\"\n",
+    );
+    let order = open(
+        &mut host,
+        "common/holy_orders/test.txt",
+        "first = { localization = family } second = { localization = family }",
+    );
+    let alerts = open(
+        &mut host,
+        "common/alerts.txt",
+        "alerts = { popup = { category = LOW } }",
+    );
+    let snapshot = host.snapshot();
+    let pos = "song = { name = ".len() as u32;
+    assert!(
+        definition(&snapshot, &list, pos)
+            .iter()
+            .any(|loc| loc.document.as_ref() == Some(&album))
+    );
+    let card = hover(&snapshot, &list, pos).unwrap();
+    assert!(card.contents.contains("Track name"), "{}", card.contents);
+    let card = hover(
+        &snapshot,
+        &order,
+        "first = { localization = ".len() as u32 + 1,
+    )
+    .unwrap();
+    for text in ["Short name", "Full name"] {
+        assert!(card.contents.contains(text), "{}", card.contents);
+    }
+    let card = hover(&snapshot, &alerts, "alerts = { ".len() as u32 + 1).unwrap();
+    assert!(card.contents.contains("Alert heading"), "{}", card.contents);
+}
+
+#[test]
+fn ir_country_tag_hover_resolves_optional_name_and_adjective() {
+    let mut host = host();
+    open(
+        &mut host,
+        "localisation/tags_l_english.yml",
+        "l_english:\n XQA:0 \"Test Republic\"\n XQA_ADJ:0 \"Republican\"\n",
+    );
+    let id = open(
+        &mut host,
+        "common/country_tags/test.txt",
+        "XQA = \"countries/First.txt\"\nXQB = \"countries/Second.txt\"",
+    );
+    let snapshot = host.snapshot();
+    let result = hover(&snapshot, &id, 1).expect("country tag hover");
+    for row in ["| name | Test Republic |", "| adj | Republican |"] {
+        assert!(result.contents.contains(row), "{}", result.contents);
+    }
+    assert!(
+        diagnostics(&snapshot, &id)
+            .iter()
+            .all(|item| item.code != DiagnosticCode::UnknownLocalisationKey)
+    );
+}
+
+#[test]
 fn ir_hover_preserves_every_binding_label_for_identical_localisation_text() {
     let mut host = host();
     open(

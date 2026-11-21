@@ -1,6 +1,20 @@
 {
   "types": {
     "achievement": {},
+    "achievement_loc": {
+      "impl": {
+        "Localised": {
+          "desc": {
+            "loc": "$_DESC",
+            "required": true
+          },
+          "name": {
+            "loc": "$_NAME",
+            "required": true
+          }
+        }
+      }
+    },
     "advisor_id": {},
     "advisor_type": {
       "impl": {
@@ -34,6 +48,18 @@
         }
       }
     },
+    "alert": {
+      "impl": {
+        "Localised": {
+          "delayed": {
+            "loc": "$_delayed"
+          },
+          "instant": {
+            "loc": "$_instant"
+          }
+        }
+      }
+    },
     "alerts": {},
     "ambient_object": {},
     "ambient_object_basis": {},
@@ -51,6 +77,9 @@
     "ancestor_personality": {
       "impl": {
         "Localised": {
+          "death_message": {
+            "loc": "ancestor_$_personality_die_desc"
+          },
           "desc": {
             "loc": "desc_ancestor_$_personality"
           },
@@ -65,6 +94,12 @@
     "area": {
       "impl": {
         "Localised": {
+          "adj": {
+            "loc": "$_adj"
+          },
+          "derived_name": {
+            "loc": "$_name"
+          },
           "name": {
             "loc": "$",
             "required": true
@@ -526,7 +561,17 @@
         "T97",
         "T98",
         "T99"
-      ]
+      ],
+      "impl": {
+        "Localised": {
+          "adj": {
+            "loc": "$_ADJ"
+          },
+          "name": {
+            "loc": "$"
+          }
+        }
+      }
     },
     "cult": {
       "impl": {
@@ -630,7 +675,17 @@
         "uses_revolutionary_zeal",
         "valid_for_nation_designer",
         "valid_for_new_country"
-      ]
+      ],
+      "impl": {
+        "Localised": {
+          "enabled": {
+            "loc": "mechanic_$_yes"
+          },
+          "short": {
+            "loc": "mechanic_$"
+          }
+        }
+      }
     },
     "custom_button": {},
     "custom_country_colors": {},
@@ -732,9 +787,27 @@
     "estate": {
       "impl": {
         "Localised": {
+          "desc": {
+            "loc": "$_desc"
+          },
+          "influence_modifier": {
+            "loc": "$_influence_modifier",
+            "strip_prefix": "estate_"
+          },
+          "loyalty_modifier": {
+            "loc": "$_loyalty_modifier",
+            "strip_prefix": "estate_"
+          },
           "name": {
             "loc": "$",
             "required": true
+          },
+          "ownership": {
+            "loc": "$_ownership"
+          },
+          "privilege_slots": {
+            "loc": "$_privilege_slots",
+            "strip_prefix": "estate_"
           }
         }
       }
@@ -869,7 +942,19 @@
         }
       }
     },
-    "flagship_modification": {},
+    "flagship_modification": {
+      "impl": {
+        "Localised": {
+          "desc": {
+            "loc": "$_desc"
+          },
+          "name": {
+            "loc": "$",
+            "required": true
+          }
+        }
+      }
+    },
     "game_age": {
       "impl": {
         "HasIcon": {
@@ -897,6 +982,20 @@
     "game_age_ability": {
       "impl": {
         "Localised": {
+          "name": {
+            "loc": "$",
+            "required": true
+          }
+        }
+      }
+    },
+    "game_age_objective": {
+      "impl": {
+        "Localised": {
+          "desc": {
+            "loc": "$_desc",
+            "required": true
+          },
           "name": {
             "loc": "$",
             "required": true
@@ -944,6 +1043,9 @@
     "government": {
       "impl": {
         "Localised": {
+          "desc": {
+            "loc": "$_desc"
+          },
           "name": {
             "loc": "$_name"
           }
@@ -978,6 +1080,9 @@
     "government_mechanic_power": {
       "impl": {
         "Localised": {
+          "desc": {
+            "loc": "$_desc"
+          },
           "gain_modifier": {
             "loc": "$_gain_modifier",
             "required": true
@@ -1004,6 +1109,16 @@
           "description": {
             "loc": "$_desc"
           },
+          "name": {
+            "loc": "$",
+            "required": true
+          }
+        }
+      }
+    },
+    "government_reform_level": {
+      "impl": {
+        "Localised": {
           "name": {
             "loc": "$",
             "required": true
@@ -1075,6 +1190,18 @@
           "name": {
             "loc": "$",
             "required": true
+          }
+        }
+      }
+    },
+    "holy_order_loc": {
+      "impl": {
+        "Localised": {
+          "full": {
+            "loc": "$_full"
+          },
+          "short": {
+            "loc": "$_short"
           }
         }
       }
@@ -1199,6 +1326,9 @@
           "name": {
             "loc": "$",
             "required": true
+          },
+          "origin": {
+            "loc": "$_origin"
           }
         }
       }
@@ -1250,6 +1380,7 @@
         "ModifierSource": {}
       }
     },
+    "localisation": {},
     "luck": {},
     "mapclimate": {},
     "mercenary_company": {
@@ -1279,6 +1410,15 @@
     },
     "mission_series": {
       "resolution": "replace"
+    },
+    "music_track": {
+      "impl": {
+        "Localised": {
+          "name": {
+            "loc": "$"
+          }
+        }
+      }
     },
     "named_unrest": {
       "open": true
@@ -1316,6 +1456,9 @@
           },
           "dialog": {
             "loc": "$_dialog"
+          },
+          "name": {
+            "loc": "$"
           },
           "title": {
             "loc": "$_title",
@@ -1448,7 +1591,15 @@
         "ModifierSource": {}
       }
     },
-    "power_projection": {},
+    "power_projection": {
+      "impl": {
+        "Localised": {
+          "name": {
+            "loc": "$"
+          }
+        }
+      }
+    },
     "prices": {},
     "professionalism_modifier": {
       "impl": {
@@ -1579,6 +1730,9 @@
           "name": {
             "loc": "$",
             "required": true
+          },
+          "reformation_center": {
+            "loc": "$_center_of_reformation"
           }
         }
       }
@@ -1604,6 +1758,24 @@
         "Localised": {
           "name": {
             "loc": "$",
+            "required": true
+          }
+        }
+      }
+    },
+    "religious_aspects_loc": {
+      "impl": {
+        "Localised": {
+          "long": {
+            "loc": "$_LONG",
+            "required": true
+          },
+          "power_name": {
+            "loc": "$_POWER_NAME",
+            "required": true
+          },
+          "short": {
+            "loc": "$_SHORT",
             "required": true
           }
         }
@@ -1703,6 +1875,9 @@
     "states_general_faction": {
       "impl": {
         "Localised": {
+          "mechanic_tooltip": {
+            "loc": "$_MECHANIC_TOOLTIP"
+          },
           "name": {
             "loc": "$",
             "required": true
@@ -1745,7 +1920,16 @@
       }
     },
     "subject_type_upgrade": {},
-    "subject_upgrades": {},
+    "subject_upgrades": {
+      "impl": {
+        "Localised": {
+          "name": {
+            "loc": "$",
+            "required": true
+          }
+        }
+      }
+    },
     "superregion": {
       "impl": {
         "Localised": {
@@ -1763,7 +1947,20 @@
       }
     },
     "tech_ahead_of_time": {},
-    "technology": {},
+    "technology": {
+      "impl": {
+        "Localised": {
+          "desc": {
+            "loc": "$_desc",
+            "required": true
+          },
+          "name": {
+            "loc": "$_name",
+            "required": true
+          }
+        }
+      }
+    },
     "technology_file": {},
     "technology_group": {
       "impl": {
@@ -1782,6 +1979,9 @@
     "terrain": {
       "impl": {
         "Localised": {
+          "desc": {
+            "loc": "$_desc"
+          },
           "type": {
             "loc": "$",
             "required": true
@@ -1790,7 +1990,16 @@
         "ModifierSource": {}
       }
     },
-    "timed_modifier": {},
+    "timed_modifier": {
+      "impl": {
+        "Localised": {
+          "name": {
+            "loc": "$",
+            "required": true
+          }
+        }
+      }
+    },
     "trade_center": {
       "impl": {
         "Localised": {

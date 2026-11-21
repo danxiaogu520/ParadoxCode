@@ -419,6 +419,9 @@ pub struct GameProfile {
     /// Entries omit the leading dot and are compared case-insensitively. An empty list keeps
     /// every extension, preserving the generic profile behavior.
     pub scan_extensions: Vec<String>,
+    /// Additional source extensions allowed only within the specified scan roots.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub scan_root_extensions: BTreeMap<String, Vec<String>>,
     /// Read-only archive tiers scanned after the whitelisted roots.
     ///
     /// Each entry names a directory (relative to a source root) that supplements the main
@@ -709,6 +712,7 @@ impl GameProfile {
             scan_root_max_depths: BTreeMap::new(),
             scan_root_files: BTreeMap::new(),
             scan_extensions: Vec::new(),
+            scan_root_extensions: BTreeMap::new(),
             scan_archive_roots: Vec::new(),
             scan_archive_extensions: Vec::new(),
             scripted_localisation_directories: Vec::new(),
@@ -1072,9 +1076,13 @@ impl GameProfile {
         else {
             return false;
         };
-        self.scan_extensions.iter().any(|allowed| {
-            extension.eq_ignore_ascii_case(allowed.strip_prefix('.').unwrap_or(allowed))
-        })
+        let matches =
+            |allowed: &String| extension.eq_ignore_ascii_case(allowed.trim_start_matches('.'));
+        self.scan_extensions.iter().any(matches)
+            || self.scan_root_extensions.iter().any(|(root, extensions)| {
+                self.allows_profile_path_in_root(root, logical_path)
+                    && extensions.iter().any(matches)
+            })
     }
 
     /// Returns the first matching top-level definition rule.

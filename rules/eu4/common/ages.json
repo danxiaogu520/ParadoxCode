@@ -340,7 +340,7 @@
         {
           "body": "game_age_objective_body",
           "card": "1..*",
-          "key": "scalar",
+          "key": "def<game_age_objective>",
           "scope": {
             "set": {
               "root": "country",

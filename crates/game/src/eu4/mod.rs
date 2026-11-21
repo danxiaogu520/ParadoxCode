@@ -215,6 +215,7 @@ mod tests {
                 "scripted_localisation".to_owned(),
                 "scripted_localization".to_owned(),
                 "scripted_loc".to_owned(),
+                "customizable_localization".to_owned(),
             ]
         );
         assert!(profile.is_scripted_localisation_path("dlc/foo/common/scripted_loc/defs.txt"));
@@ -265,6 +266,8 @@ mod tests {
         assert!(!profile.allows_scan_file("map/random/tiles/tile0.txt"));
         assert!(!profile.allows_scan_file("map/lakes/unknown.txt"));
         assert_eq!(profile.scan_extensions(), ["txt", "gfx", "yml", "yaml"]);
+        assert!(profile.allows_scan_file("music/tracks.asset"));
+        assert!(!profile.allows_scan_file("sound/tracks.asset"));
         assert!(
             profile
                 .scan_roots()

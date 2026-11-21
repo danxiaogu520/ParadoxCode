@@ -1081,6 +1081,7 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
             { pattern: '**/map/superregion.txt' },
             { pattern: '**/map/terrain.txt' },
             { pattern: '**/map/trade_winds.txt' },
+            { pattern: '**/music/*.asset' },
             { pattern: '**/music/*.txt' },
             { pattern: '**/missions/*.txt' },
             { pattern: '**/sound/*.txt' },

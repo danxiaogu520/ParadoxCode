@@ -1825,7 +1825,7 @@
         {
           "body": "government_reform_level_body",
           "card": "0..1",
-          "key": "scalar"
+          "key": "def<government_reform_level>"
         }
       ]
     },

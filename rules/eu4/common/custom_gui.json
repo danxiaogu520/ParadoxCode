@@ -29,7 +29,7 @@
           },
           "doc": "Tooltip to display while hovering this button. Not required, but highly recommended.",
           "severity": "warning",
-          "value": "scalar"
+          "value": "ref<localisation> | scalar"
         },
         "trigger": {
           "body": "trigger",

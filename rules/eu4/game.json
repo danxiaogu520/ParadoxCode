@@ -146,6 +146,9 @@
     "yml",
     "yaml"
   ],
+  "scan_root_extensions": {
+    "music": ["asset"]
+  },
   "scan_root_files": {
     "common": [
       "achievements.txt",
@@ -431,7 +434,8 @@
   "scripted_localisation_directories": [
     "scripted_localisation",
     "scripted_localization",
-    "scripted_loc"
+    "scripted_loc",
+    "customizable_localization"
   ],
   "source_encoding": "windows-1252",
   "source_format_version": 14,

@@ -39,7 +39,9 @@ pub fn definition_with_cancellation(
     // Vanilla definition/reference into a temporary workspace before resolving a single target.
     let all = document_semantic_workspace(snapshot, document, &input, cancellation)?;
     let Some((kind, name)) = symbol_at(&all, document, position) else {
-        return Ok(Vec::new());
+        return Ok(rule_localisation_locations(
+            snapshot, &input, &all, position,
+        ));
     };
     let resolution = resolve_symbol(snapshot, &all, &kind, &name);
     // Cache indexes contain the normal definition/reference shards. If a profile-specific
@@ -55,6 +57,50 @@ pub fn definition_with_cancellation(
         Resolution::Unique(definition) => vec![definition_selection_location(&definition)],
         Resolution::Missing => Vec::new(),
     })
+}
+
+/// Rule keys and enum literals can point to display text without becoming editable references.
+fn rule_localisation_locations(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    workspace: &SemanticWorkspace,
+    position: TextSize,
+) -> Vec<Location> {
+    let Some(hir) = input.hir.as_deref() else {
+        return Vec::new();
+    };
+    for property in hir.properties() {
+        let is_key = contains(property.key_range, position);
+        let spelling = if is_key {
+            &property.key
+        } else if let Some(scalar) = property
+            .scalar
+            .as_ref()
+            .filter(|v| contains(v.range, position))
+        {
+            &scalar.value
+        } else {
+            continue;
+        };
+        let Some(fact) = hir.field_fact_at(property.key_range) else {
+            continue;
+        };
+        let mut locations = Vec::new();
+        for id in &fact.fields {
+            for (_, key) in snapshot.ir().field_localisation_keys(*id, is_key, spelling) {
+                if let Resolution::Unique(def) =
+                    resolve_symbol(snapshot, workspace, "localisation", &key)
+                {
+                    let location = definition_selection_location(&def);
+                    if !locations.contains(&location) {
+                        locations.push(location);
+                    }
+                }
+            }
+        }
+        return locations;
+    }
+    Vec::new()
 }
 
 /// Returns resolved references for the symbol at a position.
@@ -447,6 +493,12 @@ pub fn rename_with_cancellation(
         {
             return Ok(());
         }
+        if target.kind == "localisation"
+            && location_source(snapshot, &reference.location())
+                .is_none_or(|source| !range_spells_name(&source, reference.range, &target.name))
+        {
+            return Err(RenameError::Incomplete.into());
+        }
         edits.push(WorkspaceTextEdit {
             location: reference.location(),
             new_text: new_name.to_owned(),
@@ -648,6 +700,19 @@ pub(crate) fn rename_target(
     let Some((kind, name)) = symbol_at(&all, document, position) else {
         return Err(RenameError::NoSymbol.into());
     };
+    if input
+        .hir
+        .iter()
+        .flat_map(|hir| hir.references())
+        .any(|reference| {
+            reference.origin == hir::HirReferenceOrigin::DerivedLocalisation
+                && reference.name == name
+                && contains(reference.range, position)
+                && !range_spells_name(&input.source, reference.range, &name)
+        })
+    {
+        return Err(RenameError::Incomplete.into());
+    }
     // Renaming one of several same-priority duplicates would strand the others
     // under the old name, so duplicates stay unrenamable even though resolution
     // itself now follows the later-definition-wins rule.
@@ -661,12 +726,37 @@ pub(crate) fn rename_target(
     if !writable_location(snapshot, &definition.location) {
         return Err(RenameError::ReadOnly.into());
     }
+    if !definition.selection_range.is_empty()
+        && let Some(source) = location_source(snapshot, &definition.location)
+        && !range_spells_name(&source, definition.selection_range, &name)
+    {
+        // A generated identity such as a numbered technology has no editable name token.
+        return Err(RenameError::Incomplete.into());
+    }
     Ok(RenameTarget {
         kind,
         name,
         cursor_range: word_range(&input.source, position),
         definition,
     })
+}
+
+fn location_source(
+    snapshot: &AnalysisSnapshot,
+    location: &Location,
+) -> Option<std::sync::Arc<str>> {
+    if let Some(document) = &location.document {
+        return snapshot.document(document).map(|d| d.text_handle());
+    }
+    snapshot
+        .file_state(location.file?)
+        .map(|state| state.source_handle())
+}
+
+fn range_spells_name(source: &str, range: text::TextRange, name: &str) -> bool {
+    source
+        .get(range.start() as usize..range.end() as usize)
+        .is_some_and(|spelling| same_name(spelling.trim_matches('"'), name))
 }
 
 pub(crate) fn check_rename_conflict(

@@ -572,6 +572,56 @@ fn required_type_localisation_templates_expand_from_dynamic_members() {
 }
 
 #[test]
+fn localisation_bindings_use_the_achievement_field_and_nested_definition_keys() {
+    let rules = runtime_rules().expect("first-party rules");
+    for (path, source, kind, name, keys) in [
+        (
+            "common/achievements.txt",
+            "test_achievement = { localization = TEST_PREFIX }",
+            "achievement_loc",
+            "TEST_PREFIX",
+            &["TEST_PREFIX_NAME", "TEST_PREFIX_DESC"][..],
+        ),
+        (
+            "common/ages/test.txt",
+            "test_age = { objectives = { test_objective = { } } }",
+            "game_age_objective",
+            "test_objective",
+            &["test_objective", "test_objective_desc"][..],
+        ),
+        (
+            "common/governments/test.txt",
+            "test_government = { reform_levels = { test_level = { reforms = { } } } }",
+            "government_reform_level",
+            "test_level",
+            &["test_level"][..],
+        ),
+    ] {
+        let hir = lower_with_profile(
+            parse(FileFormat::Script, source),
+            &LogicalPath::parse(path).unwrap(),
+            &rules,
+            &profile(),
+        );
+        let definition = hir
+            .definitions()
+            .iter()
+            .find(|definition| definition.kind.as_ref() == kind && definition.name == name)
+            .unwrap_or_else(|| panic!("missing {kind} definition for {name}"));
+        let derived = hir
+            .references()
+            .iter()
+            .filter(|reference| {
+                reference.origin == HirReferenceOrigin::DerivedLocalisation
+                    && reference.range == definition.selection_range
+            })
+            .map(|reference| reference.name.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(derived, keys.iter().copied().collect(), "{path}");
+    }
+}
+
+#[test]
 fn ir_display_bindings_do_not_depend_on_structural_flags() {
     let path = LogicalPath::parse("common/ideas/all.txt").unwrap();
     let ir = first_party_ir().unwrap();
