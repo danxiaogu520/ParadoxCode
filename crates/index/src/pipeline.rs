@@ -385,6 +385,32 @@ fn cached_or_parse(
     parsed
 }
 
+/// Resolves an editor document to the same rule path used for its parsing.
+#[must_use]
+pub fn logical_path_for_document(
+    rules: &RuleSet,
+    roots: &[SourceRoot],
+    id: &DocumentId,
+    path: Option<&Path>,
+) -> Option<LogicalPath> {
+    path.and_then(|path| {
+        roots
+            .iter()
+            .filter_map(|root| path.strip_prefix(&root.path).ok())
+            .filter_map(|relative| LogicalPath::parse(&relative.to_string_lossy()).ok())
+            .min_by_key(|path| path.as_str().len())
+    })
+    .or_else(|| path.and_then(|path| rules.logical_path_for_uri(&path.to_string_lossy())))
+    .or_else(|| rules.logical_path_for_uri(id.as_str()))
+    .or_else(|| path.and_then(|path| LogicalPath::parse(&path.to_string_lossy()).ok()))
+    .or_else(|| {
+        id.as_str()
+            .split(['/', '\\'])
+            .next_back()
+            .and_then(|name| LogicalPath::parse(name).ok())
+    })
+}
+
 fn parser_for_document(
     ir: Option<&RulesIr>,
     rules: &RuleSet,
@@ -393,23 +419,7 @@ fn parser_for_document(
     id: &DocumentId,
     path: Option<&Path>,
 ) -> Option<(ParserKind, Option<LogicalPath>)> {
-    let logical = path
-        .and_then(|path| {
-            roots
-                .iter()
-                .filter_map(|root| path.strip_prefix(&root.path).ok())
-                .filter_map(|relative| LogicalPath::parse(&relative.to_string_lossy()).ok())
-                .min_by_key(|path| path.as_str().len())
-        })
-        .or_else(|| path.and_then(|path| rules.logical_path_for_uri(&path.to_string_lossy())))
-        .or_else(|| rules.logical_path_for_uri(id.as_str()))
-        .or_else(|| path.and_then(|path| LogicalPath::parse(&path.to_string_lossy()).ok()))
-        .or_else(|| {
-            id.as_str()
-                .split(['/', '\\'])
-                .next_back()
-                .and_then(|name| LogicalPath::parse(name).ok())
-        });
+    let logical = logical_path_for_document(rules, roots, id, path);
     if logical
         .as_ref()
         .is_some_and(|path| profile.rejects_unlisted_root_file(path.as_str()))

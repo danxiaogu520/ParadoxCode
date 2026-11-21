@@ -2,7 +2,7 @@
 
 use libfuzzer_sys::fuzz_target;
 use parser::format::format;
-use parser::{FileFormat, TokenKind, parse};
+use parser::{FileFormat, TokenKind, parse, parse_quoted_script};
 
 fuzz_target!(|data: &[u8]| {
     let Ok(source) = std::str::from_utf8(data) else {
@@ -32,22 +32,25 @@ fuzz_target!(|data: &[u8]| {
     assert_eq!(parsed.tokens().len(), reparsed.tokens().len());
     for (before, after) in parsed.tokens().iter().zip(reparsed.tokens()) {
         assert_eq!(before.kind(), after.kind());
-        if before.kind() != TokenKind::Quoted
-            || !parsed
-                .text(before.range())
-                .is_some_and(|text| text.contains('\n'))
+        let before_text = parsed.text(before.range()).expect("before token text");
+        let after_text = reparsed.text(after.range()).expect("after token text");
+        if before_text == after_text
+            || parser::format::canonical_keyword(before_text) == after_text
+            || parser::format::is_asset_path_normalization(before_text, after_text)
         {
-            let before_text = parsed.text(before.range()).expect("before token text");
-            let after_text = reparsed.text(after.range()).expect("after token text");
-            // Beyond byte-identical text, the formatter may only apply its two
-            // canonical rewrites: keyword casing and asset-path separators.
-            assert!(
-                before_text == after_text
-                    || parser::format::canonical_keyword(before_text) == after_text
-                    || parser::format::is_asset_path_normalization(before_text, after_text),
-                "unexpected rewrite: {before_text:?} -> {after_text:?}"
-            );
+            continue;
         }
+        // Other token rewrites must be formatted quoted Script payloads.
+        assert!(
+            before.kind() == TokenKind::Quoted
+                && before_text.contains(['\r', '\n', '{'])
+                && [before_text, after_text].into_iter().all(|text| {
+                    parse_quoted_script(text).is_some_and(|script| {
+                        script.is_closed() && script.parsed().errors().is_empty()
+                    })
+                }),
+            "unexpected rewrite: {before_text:?} -> {after_text:?}"
+        );
     }
     assert!(format(&reparsed).edits.is_empty());
 });

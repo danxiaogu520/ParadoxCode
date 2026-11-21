@@ -25,6 +25,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The VS Code Loaded Files view starts collapsed in new workspaces and fetches the file list
   on demand when expanded.
 
+- EU4 script formatting uses schema-specific list layouts. Mission prerequisites expand from two
+  entries, fixed vectors stay on one line, and long province lists wrap in groups.
+
 ### Fixed
 
 - EU4 government reform hovers show a single reform reference type. Hovers and completions mark
@@ -32,6 +35,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - EU4 event and mission previews render localisation colours, escaped line breaks and inline
   country flags. Event descriptions grow with their content and scroll when they exceed the panel.
+
+- Complex Script blocks inside single-line quoted arguments expand during formatting.
 
 ## [0.5.6] - 2026-11-17
 

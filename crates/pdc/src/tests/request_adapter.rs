@@ -1539,12 +1539,13 @@ fn memory_transport_resolves_completion_items_by_data() {
 
 #[test]
 fn memory_transport_formats_safe_text_and_refuses_recovered_syntax() {
-    let valid_uri = "file:///tmp/format-valid.txt";
+    let valid_uri = "file:///tmp/missions/format-valid.txt";
     let unsafe_uri = "file:///tmp/format-unsafe.txt";
+    let source = r#"root={task={name="汉😀" required_missions={a b a} effect="if={x=yes y=yes}"}}"#;
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":"file:///tmp","name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":valid_uri,"languageId":"eu4","version":1,"text":"root={name=\"汉😀\" other=yes}"}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":valid_uri,"languageId":"eu4","version":1,"text":source}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/formatting","params":{"textDocument":{"uri":valid_uri},"options":{"tabSize":2,"insertSpaces":true}}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":unsafe_uri,"languageId":"eu4","version":1,"text":"country_event = {"}}}),
         json!({"jsonrpc":"2.0","id":3,"method":"textDocument/formatting","params":{"textDocument":{"uri":unsafe_uri},"options":{"tabSize":4,"insertSpaces":true}}}),
@@ -1559,7 +1560,6 @@ fn memory_transport_formats_safe_text_and_refuses_recovered_syntax() {
     let responses = decode_frames(&output);
 
     let edits = typed_result::<Vec<lsp_types::TextEdit>>(&responses, 2);
-    let source = "root={name=\"汉😀\" other=yes}";
     let line_index = LineIndex::new(source);
     let mut formatted = source.to_owned();
     for edit in edits.iter().rev() {
@@ -1577,7 +1577,15 @@ fn memory_transport_formats_safe_text_and_refuses_recovered_syntax() {
             .expect("format edit end");
         formatted.replace_range(start as usize..end as usize, &edit.new_text);
     }
-    assert_eq!(formatted, "ROOT = {\n\tname = \"汉😀\"\n\tother = yes\n}\n");
+    assert_eq!(
+        formatted,
+        concat!(
+            "ROOT = {\n\ttask = {\n\t\tname = \"汉😀\"\n",
+            "\t\trequired_missions = {\n\t\t\ta\n\t\t\tb\n\t\t\ta\n\t\t}\n",
+            "\t\teffect = \"\n\t\t\tif = {\n\t\t\t\tx = yes\n\t\t\t\ty = yes\n\t\t\t}\n",
+            "\t\t\"\n\t}\n}\n",
+        )
+    );
     let unsafe_edits = typed_result::<Vec<lsp_types::TextEdit>>(&responses, 3);
     assert!(unsafe_edits.is_empty());
 }

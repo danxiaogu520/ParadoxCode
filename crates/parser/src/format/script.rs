@@ -1,3 +1,4 @@
+use super::ListLayout;
 use super::common::{contains_line_break, fits_line, indent};
 use super::paths::{is_asset_path_spelling, normalize_asset_path_separators};
 use crate::{
@@ -5,10 +6,14 @@ use crate::{
     parse_quoted_script as parse_quoted_payload,
 };
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use text::TextRange;
 const MAX_QUOTED_SCRIPT_DEPTH: usize = 64;
-pub(super) fn format_script(file: &ParsedFile) -> String {
-    PdcFormatter::new(file, 0).document()
+pub(super) fn format_script(
+    file: &ParsedFile,
+    layouts: &BTreeMap<TextRange, ListLayout>,
+) -> String {
+    PdcFormatter::new(file, 0, Some(layouts)).document()
 }
 enum ValueLayout {
     Inline {
@@ -41,13 +46,19 @@ impl ValueLayout {
 struct PdcFormatter<'file> {
     file: &'file ParsedFile,
     quoted_script_depth: usize,
+    list_layouts: Option<&'file BTreeMap<TextRange, ListLayout>>,
 }
 
 impl<'file> PdcFormatter<'file> {
-    fn new(file: &'file ParsedFile, quoted_script_depth: usize) -> Self {
+    fn new(
+        file: &'file ParsedFile,
+        quoted_script_depth: usize,
+        list_layouts: Option<&'file BTreeMap<TextRange, ListLayout>>,
+    ) -> Self {
         Self {
             file,
             quoted_script_depth,
+            list_layouts,
         }
     }
 
@@ -71,7 +82,7 @@ impl<'file> PdcFormatter<'file> {
         } else {
             &children[..]
         };
-        let mut lines = self.sequence(children, 0);
+        let mut lines = self.sequence(children, 0, None);
         if has_bom {
             if let Some(first) = lines.first_mut() {
                 first.insert(0, '\u{feff}');
@@ -82,7 +93,7 @@ impl<'file> PdcFormatter<'file> {
         lines
     }
 
-    fn sequence(&self, children: &[CstNode<'_>], depth: usize) -> Vec<String> {
+    fn sequence(&self, children: &[CstNode<'_>], depth: usize, pack: Option<usize>) -> Vec<String> {
         let mut lines = Vec::new();
         let mut index = 0;
         while index < children.len() {
@@ -97,10 +108,13 @@ impl<'file> PdcFormatter<'file> {
                 continue;
             }
 
-            let mut item = self.item(node, depth);
-            if let Some(comment) = children.get(index + 1)
+            let packed =
+                pack.and_then(|stride| self.pack_scalars(&children[index..], depth, stride));
+            let (mut item, consumed) = packed.unwrap_or_else(|| (self.item(node, depth), 1));
+            index += consumed;
+            if let Some(comment) = children.get(index)
                 && comment.kind() == CstKind::Comment
-                && self.same_source_line(node, *comment)
+                && self.same_source_line(children[index - 1], *comment)
             {
                 if let Some(last) = item.last_mut() {
                     last.push(' ');
@@ -109,9 +123,47 @@ impl<'file> PdcFormatter<'file> {
                 index += 1;
             }
             lines.extend(item);
-            index += 1;
         }
         lines
+    }
+
+    fn pack_scalars(
+        &self,
+        children: &[CstNode<'_>],
+        depth: usize,
+        stride: usize,
+    ) -> Option<(Vec<String>, usize)> {
+        let mut items = Vec::new();
+        for (index, child) in children.iter().copied().enumerate() {
+            if !is_scalar_node(child)
+                || (index > 0 && !self.same_source_line(children[index - 1], child))
+            {
+                break;
+            }
+            let Some(item) = self.inline_item(child, depth) else {
+                break;
+            };
+            items.push(item);
+        }
+        if items.is_empty() {
+            return None;
+        }
+
+        let indentation = indent(depth);
+        let mut lines = Vec::new();
+        let mut chunks = items.chunks(stride).map(|chunk| chunk.join(" "));
+        let mut line = format!("{indentation}{}", chunks.next()?);
+        for chunk in chunks {
+            let next = format!("{line} {chunk}");
+            if fits_line(&next) {
+                line = next;
+            } else {
+                lines.push(line);
+                line = format!("{indentation}{chunk}");
+            }
+        }
+        lines.push(line);
+        Some((lines, items.len()))
     }
 
     fn item(&self, node: CstNode<'_>, depth: usize) -> Vec<String> {
@@ -256,21 +308,39 @@ impl<'file> PdcFormatter<'file> {
         node: CstNode<'_>,
         depth: usize,
         compact: bool,
-        force_expand: bool,
+        mut force_expand: bool,
     ) -> ValueLayout {
         let children: Vec<_> = node.children().collect();
-        if compact {
+        let list_layout = self
+            .list_layouts
+            .and_then(|layouts| layouts.get(&node.range()).copied())
+            .unwrap_or_default();
+        let has_scalar_items = children.iter().any(|child| is_scalar_node(*child));
+        let multiline_list = has_scalar_items
+            && match list_layout {
+                ListLayout::Inline => false,
+                ListLayout::OnePerLine => children
+                    .iter()
+                    .filter(|child| is_scalar_node(**child))
+                    .nth(1)
+                    .is_some(),
+                _ => contains_line_break(self.text(node)),
+            };
+        if compact && !multiline_list {
             let items = children
                 .iter()
                 .filter(|child| child.kind() != CstKind::Bom)
                 .map(|child| self.compact_item(*child, depth))
                 .collect::<Option<Vec<_>>>();
             if let Some(items) = items {
-                return if items.is_empty() {
-                    ValueLayout::inline("{ }")
-                } else {
-                    ValueLayout::inline(format!("{{ {} }}", items.join(" ")))
-                };
+                if items.is_empty() {
+                    return ValueLayout::inline("{ }");
+                }
+                let text = format!("{{ {} }}", items.join(" "));
+                if !has_scalar_items || list_layout == ListLayout::Inline || fits_line(&text) {
+                    return ValueLayout::inline(text);
+                }
+                force_expand = true;
             }
         }
 
@@ -281,13 +351,19 @@ impl<'file> PdcFormatter<'file> {
             if children.is_empty() {
                 return ValueLayout::inline("{ }");
             }
-            if children.iter().all(|child| is_scalar_node(*child))
+            if !multiline_list
+                && children.iter().all(|child| is_scalar_node(*child))
                 && let Some(items) = children
                     .iter()
                     .map(|child| self.inline_item(*child, depth))
                     .collect::<Option<Vec<_>>>()
             {
-                return ValueLayout::inline(format!("{{ {} }}", items.join(" ")));
+                let text = format!("{{ {} }}", items.join(" "));
+                return if list_layout == ListLayout::Inline {
+                    ValueLayout::inline(text)
+                } else {
+                    ValueLayout::width_sensitive(text)
+                };
             }
             if children.len() == 1
                 && children[0].kind() == CstKind::Property
@@ -297,9 +373,20 @@ impl<'file> PdcFormatter<'file> {
             }
         }
 
-        let header_comment = children
-            .first()
-            .filter(|node| node.kind() == CstKind::Comment);
+        let pack = match list_layout {
+            ListLayout::Wrap => Some(1),
+            ListLayout::WrapPairs => Some(2),
+            _ => None,
+        };
+        let header_comment = children.first().filter(|comment| {
+            comment.kind() == CstKind::Comment
+                && ((!has_scalar_items && list_layout == ListLayout::Auto)
+                    || self
+                        .file
+                        .source()
+                        .get(node.range().start() as usize..comment.range().start() as usize)
+                        .is_some_and(|prefix| !contains_line_break(prefix)))
+        });
         let body_children = if header_comment.is_some() {
             &children[1..]
         } else {
@@ -311,7 +398,7 @@ impl<'file> PdcFormatter<'file> {
         );
         ValueLayout::Expanded {
             opener,
-            body: self.sequence(body_children, depth.saturating_add(1)),
+            body: self.sequence(body_children, depth.saturating_add(1), pack),
             closer: format!("{}}}", indent(depth)),
         }
     }
@@ -410,17 +497,17 @@ impl<'file> PdcFormatter<'file> {
         let body = &children[1..];
         let condition = self.text(*condition);
         let has_comment = node_has_comment(node);
-        if compact || !has_comment {
-            let items = body
+        if (compact || !has_comment)
+            && let Some(items) = body
                 .iter()
                 .map(|child| self.compact_item(*child, depth))
                 .collect::<Option<Vec<_>>>()
-                .unwrap_or_default();
+        {
             return ValueLayout::inline(format!("[[{condition}]{}]", items.join(" ")));
         }
         ValueLayout::Expanded {
             opener: format!("[[{condition}]"),
-            body: self.sequence(body, depth.saturating_add(1)),
+            body: self.sequence(body, depth.saturating_add(1), None),
             closer: format!("{}]", indent(depth)),
         }
     }
@@ -439,16 +526,21 @@ impl<'file> PdcFormatter<'file> {
             }
             return ValueLayout::inline(source);
         };
-        let inner = PdcFormatter::new(&script.parsed, self.quoted_script_depth + 1);
+        let inner = PdcFormatter::new(&script.parsed, self.quoted_script_depth + 1, None);
         let lines = inner.document_lines();
         if lines.is_empty() {
             return ValueLayout::inline(source);
         }
-        if compact || (!force_expand && lines.len() == 1 && !contains_line_break(&lines[0])) {
+        if let [line] = lines.as_slice()
+            && (compact || (!force_expand && !contains_line_break(line)))
+        {
             return ValueLayout::width_sensitive(format!(
                 "\"{}\"",
-                encode_quoted_script_text(&lines[0])
+                encode_quoted_script_text(line)
             ));
+        }
+        if compact {
+            return ValueLayout::inline(source);
         }
         ValueLayout::Expanded {
             opener: "\"".to_owned(),
@@ -564,14 +656,42 @@ pub(super) struct QuotedScript {
 }
 
 pub(super) fn quoted_script(source: &str, depth: usize) -> Option<QuotedScript> {
-    if depth >= MAX_QUOTED_SCRIPT_DEPTH || !contains_line_break(source) {
+    let multiline = contains_line_break(source);
+    if depth >= MAX_QUOTED_SCRIPT_DEPTH || (!multiline && !source.contains('{')) {
         return None;
     }
-    let parsed = parse_quoted_payload(source)?.parsed().clone();
-    if !parsed.errors().is_empty() || !has_semantic_item(parsed.root()) {
+    let script = parse_quoted_payload(source)?;
+    let parsed = script.parsed();
+    if !parsed.errors().is_empty() {
         return None;
     }
-    Some(QuotedScript { parsed })
+    let is_script = if multiline {
+        has_semantic_item(parsed.root())
+    } else {
+        has_inline_script_block(parsed.root())
+    };
+    is_script.then(|| QuotedScript {
+        parsed: parsed.clone(),
+    })
+}
+
+fn has_inline_script_block(root: CstNode<'_>) -> bool {
+    // A block assignment signals Script even on one line. Loose scalars can be prose.
+    let mut has_block = false;
+    for node in root.children() {
+        match node.kind() {
+            CstKind::Property => {
+                has_block |= property_parts(node)
+                    .and_then(|(_, _, value)| value.child(0))
+                    .is_some_and(|value| {
+                        matches!(value.kind(), CstKind::Block | CstKind::HeaderBlock)
+                    });
+            }
+            CstKind::HeaderBlock | CstKind::ParameterBlock | CstKind::Comment | CstKind::Bom => {}
+            _ => return false,
+        }
+    }
+    has_block
 }
 
 fn has_semantic_item(root: CstNode<'_>) -> bool {

@@ -25,7 +25,7 @@ fn canonical_block_layout_is_recursive_and_idempotent() {
     let source = "outer={inner={factor=1}}\nlist={one\ntwo\nthree}\nmany={a=1 b=2}\n";
     let expected = concat!(
         "outer = { inner = { factor = 1 } }\n",
-        "list = { one two three }\n",
+        "list = {\n\tone\n\ttwo\n\tthree\n}\n",
         "many = {\n",
         "\ta = 1\n",
         "\tb = 2\n",
@@ -76,6 +76,60 @@ fn quoted_script_collapses_or_expands_and_opaque_text_is_unchanged() {
 }
 
 #[test]
+fn single_line_quoted_for_effect_expands_nested_blocks() {
+    let source = concat!(
+        "hidden_effect = {\n\tfor = {\n\t\tamount = 4\n",
+        "\t\teffect = \"random_owned_province = { limit = { and = { is_city = yes ",
+        "or = { has_building = workshop has_building = counting_house } ",
+        "not = { devastation = 10 } } not = { has_province_modifier = example_modifier } } ",
+        "add_province_modifier = { name = example_modifier duration = 7300 } }\"\n",
+        "\t}\n}\n",
+    );
+    let expected = concat!(
+        "hidden_effect = {\n\tfor = {\n\t\tamount = 4\n",
+        "\t\teffect = \"\n",
+        "\t\t\trandom_owned_province = {\n",
+        "\t\t\t\tlimit = {\n",
+        "\t\t\t\t\tAND = {\n",
+        "\t\t\t\t\t\tis_city = yes\n",
+        "\t\t\t\t\t\tOR = {\n",
+        "\t\t\t\t\t\t\thas_building = workshop\n",
+        "\t\t\t\t\t\t\thas_building = counting_house\n",
+        "\t\t\t\t\t\t}\n",
+        "\t\t\t\t\t\tNOT = { devastation = 10 }\n",
+        "\t\t\t\t\t}\n",
+        "\t\t\t\t\tNOT = { has_province_modifier = example_modifier }\n",
+        "\t\t\t\t}\n",
+        "\t\t\t\tadd_province_modifier = {\n",
+        "\t\t\t\t\tname = example_modifier\n",
+        "\t\t\t\t\tduration = 7300\n",
+        "\t\t\t\t}\n",
+        "\t\t\t}\n",
+        "\t\t\"\n\t}\n}\n",
+    );
+    let output = formatted(FileFormat::Script, source);
+    assert_eq!(output, expected);
+    assert_eq!(formatted(FileFormat::Script, &output), output);
+}
+
+#[test]
+fn single_line_quotes_without_a_valid_script_block_stay_opaque() {
+    let source = r#"description = "Use fallback={left right}"
+label = "state=ROOT"
+example = "text=\"{x}\""
+broken = "trigger={ value=yes"
+"#;
+    assert_eq!(formatted(FileFormat::Script, source), source);
+}
+
+#[test]
+fn quoted_script_with_multiple_lines_of_layout_survives_compact_parameter_blocks() {
+    let source = "[[name]\neffect=\"if={a=yes b=yes}\"\nnext=yes\n]\n";
+    let expected = "[[name]effect = \"if={a=yes b=yes}\" next = yes]\n";
+    assert_eq!(formatted(FileFormat::Script, source), expected);
+}
+
+#[test]
 fn quoted_script_supports_escaped_nested_quotes() {
     let source = "effect = \"\n\tname = \\\"quoted\\\"\n\tvalue = yes\n\"\n";
     let expected = "effect = \"\n\tname = \\\"quoted\\\"\n\tvalue = yes\n\"\n";
@@ -92,7 +146,7 @@ fn formatting_uses_tabs_lf_no_blank_lines_and_one_final_newline() {
 }
 
 #[test]
-fn line_width_expands_properties_but_never_scalar_only_blocks() {
+fn line_width_expands_properties_and_unclassified_lists() {
     let long_key = "界".repeat(58);
     let property_source = format!("root = {{ {long_key} = yes }}\n");
     let property_expected = format!("ROOT = {{\n\t{long_key} = yes\n}}\n");
@@ -101,11 +155,11 @@ fn line_width_expands_properties_but_never_scalar_only_blocks() {
         property_expected
     );
 
-    let scalar = "value".repeat(30);
-    let scalar_source = format!("list = {{\n{scalar}\n}}\n");
+    let scalar = "界".repeat(56);
+    let scalar_source = format!("list = {{ {scalar} end }}\n");
     assert_eq!(
         formatted(FileFormat::Script, &scalar_source),
-        format!("list = {{ {scalar} }}\n")
+        format!("list = {{\n\t{scalar}\n\tend\n}}\n")
     );
 }
 
