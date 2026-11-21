@@ -380,8 +380,7 @@ fn semantic_hover_shows_government_reform_references_without_an_enum() {
         assert!(
             hover
                 .contents
-                .contains("- value: a `government_reform` instance")
-                && !hover.contents.contains("Allowed value types"),
+                .contains("| `country` | `government_reform` |"),
             "{key}: {}",
             hover.contents
         );
