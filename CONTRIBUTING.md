@@ -177,14 +177,13 @@ fixtures remain beside their authoritative source.
 ## Documentation ownership
 
 Stable documentation lives beside the implementation it explains. Temporary design plans and
-active proposals belong in the repository root, with an explicit proposal status. Root READMEs
-provide orientation and links; component guides explain use and stable concepts. Keep both root
-language entries aligned in purpose without copying configuration tables, version numbers,
-or protocol details.
+active proposals belong in the repository root, with an explicit proposal status. Keep both root
+READMEs aligned on project purpose, installation, and links. Document workflows, support limits,
+and experimental status in component guides. Use release and CI pages for version and build status.
 
 | Information | Authoritative source | Reader view |
 | --- | --- | --- |
-| Published releases and changes | GitHub Releases; `CHANGELOG.md` | Root badges and release links |
+| Published releases and changes | GitHub Releases and `CHANGELOG.md` | Root links to releases and the changelog |
 | Rust/tool dependencies | Cargo manifests and lockfiles | Generated crate table above |
 | Extension settings and commands | `editors/vscode/package.json` and NLS bundles | [Generated reference](editors/vscode/REFERENCE.md) |
 | Rule source fields and serialization | `crates/rules/src/source.rs` | On-demand JSON Schema (`rulec schema`) and generated [source reference](crates/rules/SOURCE-REFERENCE.md) |
@@ -215,7 +214,7 @@ must remain illustrative; they are never executed by remote documentation checks
 Use issue/PR discussion for implementation decisions and acceptance records. Completed migration
 plans and logs are available in [the merged RulesIr PR](https://github.com/danxiaogu520/ParadoxCode/pull/141)
 and the [immutable migration snapshot](https://github.com/danxiaogu520/ParadoxCode/tree/2626b0a1341a72478f754c171edd53d4d8537b07/docs).
-Keep temporary design plans and active proposals in the repository root;
-[the Template proposal](TEMPLATE-PROPOSAL.md) is not a production contract.
+For the current Template implementation, see the [Template analysis guide](crates/hir/TEMPLATES.md). The original design
+and acceptance results are available in the [Template redesign record](https://github.com/danxiaogu520/ParadoxCode/blob/ecec15ef0c0468a03a0668d05986ec0d4131aaa7/TEMPLATE-PROPOSAL.md).
 
 Report security issues through [SECURITY.md](SECURITY.md).
