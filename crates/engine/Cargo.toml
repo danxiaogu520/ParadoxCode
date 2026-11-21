@@ -20,7 +20,7 @@ rules = { path = "../rules" }
 parser = { path = "../parser" }
 text = { path = "../text" }
 serde = { version = "1", features = ["derive"] }
-rusqlite = { version = "0.40", features = ["bundled", "hooks"] }
+rusqlite = { version = "0.43", features = ["bundled", "hooks"] }
 sha2 = "0.11"
 transcode = { path = "../transcode" }
 serde_json = "1"
