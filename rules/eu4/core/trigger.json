@@ -25096,7 +25096,7 @@
         },
         "value": {
           "card": "1",
-          "value": "int"
+          "value": "float"
         }
       }
     },
