@@ -25,6 +25,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The VS Code Loaded Files view starts collapsed in new workspaces and fetches the file list
   on demand when expanded.
 
+### Fixed
+
+- EU4 event and mission previews render localisation colours, escaped line breaks and inline
+  country flags. Event descriptions grow with their content and scroll when they exceed the panel.
+
 ## [0.5.6] - 2026-11-17
 
 ### Removed

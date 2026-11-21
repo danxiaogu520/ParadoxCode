@@ -76,7 +76,10 @@ contents are available.
 
 ## Event and mission hovers
 
-Hover an event definition or reference and choose **Preview Event** to open its game-style window beside the editor. The preview follows that event while you edit its script or localisation. Click its title, description or option text to open the corresponding localisation entry. Conditional descriptions link to their script. When artwork or fonts are unavailable, the same content is shown as text.
+Hover an event definition or reference and choose **Preview Event** to open its game-style window beside the editor. The preview follows that event while you edit its script or localisation. Click its title, description or option text to open the corresponding localisation entry. Conditional descriptions link to their script. The window grows with the description and scrolls when it exceeds the panel. Artwork is shown when available.
+
+Event and mission previews render EU4 colour codes, `\n` line breaks and inline country flags
+such as `@FRA`. If a flag texture is unavailable, the tag stays visible as text.
 
 Hover a mission or a prerequisite in `required_missions` and choose **Locate in Mission Tree** to open its definition file and center the node, including a node in a hidden series. Sprite and texture references keep their inline image previews. The existing `hover.eventCard` and `hover.missionCard` preferences control the respective hover links.
 

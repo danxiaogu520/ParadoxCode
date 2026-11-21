@@ -239,6 +239,12 @@ summary:focus-visible {
 
 .tooltip.visible { display: block; }
 
+.tooltip .loc-flag {
+    height: 1em;
+    width: auto;
+    vertical-align: -.1em;
+}
+
 .tooltip-dim {
     color: var(--vscode-descriptionForeground, #8a919c);
 }

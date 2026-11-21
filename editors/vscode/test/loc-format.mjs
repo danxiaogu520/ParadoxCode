@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const api = await import('file://' + join(root, 'media', 'loc-format.js').replaceAll('\\', '/'));
-const { COLORS: colors, parseLocFormat: parse } = api.default ?? api;
+const { COLORS: colors, GLOBAL_COLORS: globalColors, EVENT_DESC_COLORS: descColors, parseLocFormat: parse } = api.default ?? api;
 
 function segmentsOf(text) {
   return parse(text).segments;
@@ -40,6 +40,8 @@ for (const [code, color] of Object.entries(groundTruthColors)) {
 for (const [code, color] of Object.entries(colors)) {
   assert.match(color, /^#[0-9a-f]{6}$/, `colour for §${code} must be a #rrggbb literal`);
 }
+assert.deepEqual(globalColors, { ...groundTruthColors, G: '#00ff00', R: '#ff3232', Y: '#ffbd00' });
+assert.deepEqual(descColors, { ...groundTruthColors, G: '#18701a', R: '#7c1818', Y: '#000000' });
 
 // Plain text stays one inherit run.
 let result = parse('Hello mission');
@@ -85,5 +87,12 @@ assert.equal(result.plain, 'line one\n$VAL|$ line two',
   'newlines and $…$ placeholders must pass through');
 const newlineRun = result.segments.find((segment) => segment.text.includes('\n'));
 assert.ok(newlineRun, 'newline must stay inside a segment so the renderer can wrap on it');
+
+result = parse('§Gfirst\\n\\n@FRA§!\r\n@C01 @ROOT @ZZZ_ suffix \\\\n', descColors);
+assert.equal(result.plain, 'first\n\n@FRA\n@C01 @ROOT @ZZZ_ suffix \\n');
+assert.deepEqual(result.segments.filter(segment => segment.flag), [
+  { text: '@FRA', color: '#18701a', flag: 'FRA' },
+  { text: '@C01', color: null, flag: 'C01' },
+]);
 
 console.log('loc-format contract OK');

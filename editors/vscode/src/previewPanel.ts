@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 import { FRAME_SPRITE, FontAssets, GameAssetStore, findChineseFontMod, findGameDirectory } from './gameAssets';
+import { parseLocFormat } from './hoverCards';
 import { realUriOf } from './transparentLoc';
 import { missionPreviewStrings, webviewI18nMessage } from './webviewI18n';
 import type { PreviewTarget } from './eventPreviewPanel';
@@ -83,7 +84,7 @@ type OutboundMessage =
     /** Localised UI strings; always the first message so no data paint beats it. */
     | ReturnType<typeof webviewI18nMessage>
     /** Sprite pixels and game fonts the renderer asked for, decoded client-side. */
-    | { type: 'assets'; textures: Record<string, string>; fonts?: FontAssets }
+    | { type: 'assets'; textures: Record<string, string | null>; fonts?: FontAssets }
     | {
         type: 'options';
         zoomSensitivity: number;
@@ -310,7 +311,7 @@ export class MissionPreviewPanel {
                 MissionPreviewPanel.focusPending = false;
             }
             MissionPreviewPanel.post(panel, { type: 'preview', payload, focusMission });
-            void MissionPreviewPanel.postAssets(panel, payload);
+            void MissionPreviewPanel.postAssets(panel, payload, requestId);
         } catch (error) {
             if (cancellation.token.isCancellationRequested || requestId !== MissionPreviewPanel.requestSequence || panel !== MissionPreviewPanel.panel) {
                 return;
@@ -338,14 +339,8 @@ export class MissionPreviewPanel {
     private static assetDiscoveryTime = 0;
     /** Fonts are large payloads: post them once per store generation and panel. */
     private static postedFonts: { panel: vscode.WebviewPanel; key: string } | undefined;
-    /** Sprites are incremental payloads too: the names the receiving panel
-     * has already been sent. A rebuilt webview starts empty while this side's
-     * warm cache would suppress resends as already delivered, so any wanted
-     * name the panel has not received yet — first use, a rebuild after
-     * close/reopen, or a sprite decoded earlier for a previous panel — is
-     * force-resent. Store rebuilds need no tracking here: a fresh store is
-     * cold and therefore ships everything anyway. */
-    private static postedSprites: { panel: vscode.WebviewPanel; names: Set<string> } | undefined;
+    /** Tracks the URLs actually posted to this panel, independently of the decode cache. */
+    private static postedTextures: { panel: vscode.WebviewPanel; urls: Map<string, string> } | undefined;
 
     /** Builds the shared client-side asset store, rebuilt when its source
      * directories change. Shared with the hover texture preview middleware. */
@@ -397,19 +392,22 @@ export class MissionPreviewPanel {
         return MissionPreviewPanel.assetStore;
     }
 
-    /** Decodes the sprites a payload references (frame, node icons, arrow
-     * tiles) and pushes any newly loaded ones to the webview. Client-side
-     * decoding keeps every per-keystroke `missionPreview` response pure text.
-     * Names this panel has not received yet are resent from the warm cache
-     * (see `postedSprites`). */
+    /** Decodes referenced sprites and flags on the client and posts changed URLs. */
     private static async postAssets(
         panel: vscode.WebviewPanel,
         payload: MissionPreview,
+        requestId: number,
     ): Promise<void> {
         const wanted = new Set<string>([FRAME_SPRITE]);
+        const tags = new Set<string>();
         for (const node of payload.nodes) {
             if (node.icon) {
                 wanted.add(node.icon);
+            }
+            if (node.title?.value.includes('@')) {
+                for (const { flag } of parseLocFormat(node.title.value).segments) {
+                    if (flag) tags.add(flag);
+                }
             }
         }
         for (const arrow of payload.arrows) {
@@ -418,32 +416,52 @@ export class MissionPreviewPanel {
             }
         }
         const store = MissionPreviewPanel.store();
-        const delivered = MissionPreviewPanel.postedSprites?.panel === panel
-            ? MissionPreviewPanel.postedSprites.names
-            : new Set<string>();
-        const force = new Set<string>([...wanted].filter((name) => !delivered.has(name)));
-        const textures = await store.spriteUrls([...wanted], force);
-        const names = new Set<string>(delivered);
-        for (const name of Object.keys(textures)) {
-            names.add(name);
-        }
-        MissionPreviewPanel.postedSprites = { panel, names };
-        const config = vscode.workspace.getConfiguration('paradoxcode');
         const fontsKey = MissionPreviewPanel.assetStoreKey ?? '';
+        const [sprites, flagUrls] = await Promise.all([
+            store.spriteUrls([...wanted], wanted),
+            store.flagUrls(tags),
+        ]);
+        const config = vscode.workspace.getConfiguration('paradoxcode');
+        const gameFonts = config.get<boolean>('preview.gameFonts', true);
         let fonts: FontAssets | undefined;
         if (
-            config.get<boolean>('preview.gameFonts', true) &&
+            gameFonts &&
             (!MissionPreviewPanel.postedFonts ||
                 MissionPreviewPanel.postedFonts.panel !== panel ||
                 MissionPreviewPanel.postedFonts.key !== fontsKey)
         ) {
             const loaded = await store.loadFonts();
-            MissionPreviewPanel.postedFonts = { panel, key: fontsKey };
             if (loaded.english || loaded.chinese) {
                 fonts = loaded;
             }
         }
-        if ((Object.keys(textures).length === 0 && !fonts) || MissionPreviewPanel.panel !== panel) {
+        if (MissionPreviewPanel.panel !== panel || MissionPreviewPanel.requestSequence !== requestId) {
+            return;
+        }
+        if (gameFonts) {
+            MissionPreviewPanel.postedFonts = { panel, key: fontsKey };
+        }
+        const delivered = MissionPreviewPanel.postedTextures?.panel === panel
+            ? MissionPreviewPanel.postedTextures.urls
+            : new Map<string, string>();
+        for (const [tag, url] of flagUrls) {
+            sprites[`@${tag}`] = url;
+        }
+        const textures: Record<string, string | null> = {};
+        for (const [name, url] of Object.entries(sprites)) {
+            if (delivered.get(name) !== url) {
+                textures[name] = url;
+                delivered.set(name, url);
+            }
+        }
+        for (const name of delivered.keys()) {
+            if (name.startsWith('@') && !Object.hasOwn(sprites, name)) {
+                textures[name] = null;
+                delivered.delete(name);
+            }
+        }
+        MissionPreviewPanel.postedTextures = { panel, urls: delivered };
+        if (Object.keys(textures).length === 0 && !fonts) {
             return;
         }
         MissionPreviewPanel.post(panel, { type: 'assets', textures, fonts });
