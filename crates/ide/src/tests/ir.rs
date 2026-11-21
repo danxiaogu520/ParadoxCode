@@ -344,7 +344,7 @@ fn rule_localisation_branches_use_function_names_and_resolvable_keys() {
     let loc = open(
         &mut host,
         "localisation/branches_l_french.yml",
-        "l_french:\n test_branch:0 \"Branche\"\n",
+        "l_french:\n test_branch:0 \"Alternative\"\n",
     );
     let source = "defined_text = { name = GetSample text = { localisation_key = test_branch } text = { localisation_key = later_translation } text = { localisation_key = \"[Root.GetName]\" } text = { localisation_key = \"5.0\" } text = { localisation_key = \"\" } }";
     let id = open(&mut host, "customizable_localization/branches.txt", source);
