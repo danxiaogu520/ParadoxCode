@@ -4,6 +4,8 @@ use super::render::{HoverModel, code_span};
 use crate::support::{ParsedInput, contains};
 use crate::types::{CancellationToken, Cancelled};
 use engine::{AnalysisSnapshot, SourceRootKind};
+use rules::ir::{FieldId, FieldValue, Matcher, MatcherId, RefTarget, RulesIr};
+use std::collections::{BTreeMap, BTreeSet};
 use text::TextSize;
 
 /// Projects only actual Template script consumptions into ordinary rule hover.
@@ -97,7 +99,7 @@ pub(crate) fn template_consumption_hover(
     ));
     model.coverage = projection.body.coverage.clone();
     for item in models {
-        model.push_section(item.render());
+        model.push_model(item);
     }
     Ok(Some(model))
 }
@@ -188,20 +190,24 @@ fn texture_resolution_section(snapshot: &AnalysisSnapshot, value: &str) -> Strin
                 SourceRootKind::Dependency => "a dependency mod",
                 SourceRootKind::Vanilla => "the game or a DLC pack",
             };
-            // A DLC zip member shows the archive plus the entry inside it;
-            // the archive alone would not say which asset serves the reference.
-            let resolved = match resolution.hit.archive_member.as_deref() {
-                Some(member) => {
-                    format!("{} :: {member}", resolution.hit.path.as_path().display())
-                }
-                None => resolution.hit.path.as_path().display().to_string(),
-            };
-            let fallback = if resolution.extension_fallback {
-                "\n- note: resolved through the engine's `.tga`/`.dds` extension fallback"
+            let origin = snapshot
+                .source_roots()
+                .iter()
+                .find(|root| root.id == resolution.hit.root_id)
+                .and_then(|root| root.name.as_deref())
+                .map_or_else(
+                    || origin.to_owned(),
+                    |name| format!("dependency {}", code_span(name)),
+                );
+            let path = code_span(&resolution.logical_path);
+            if resolution.extension_fallback {
+                format!(
+                    "- resolved: {} → {path} (extension fallback) · {origin}",
+                    code_span(value)
+                )
             } else {
-                ""
-            };
-            format!("- resolved: `{resolved}`\n- found in: {origin}{fallback}")
+                format!("- resolved: {path} · {origin}")
+            }
         }
         None => "- resolved: not found in any mod, game, or DLC pack root".to_owned(),
     }
@@ -279,16 +285,17 @@ fn ir_field_hover(
             })
             .map_or(word, |property| property.key.as_str())
     };
+    let is_exact = |id: &FieldId| {
+        matches!(ir.matcher(ir.field(*id).key), Matcher::Literal(value)
+            if ir.strings().resolve(*value).eq_ignore_ascii_case(property_key))
+    };
     let mut fields = ir
         .lookup(
             fact.schema,
             property_key,
             ir.shape(fact.fields[0]).unwrap_or(rules::ir::Shape::Scalar),
         )
-        .filter(|id| {
-            matches!(ir.matcher(ir.field(*id).key), rules::ir::Matcher::Literal(value)
-                if ir.strings().resolve(*value).eq_ignore_ascii_case(property_key))
-        })
+        .filter(is_exact)
         .collect::<Vec<_>>();
     if fields.is_empty() {
         fields = fact.fields.clone();
@@ -305,12 +312,19 @@ fn ir_field_hover(
         if key { "" } else { " value" },
         code_span(word)
     ));
-    let state = hir
+    let states = hir
         .schema_facts()
         .iter()
         .filter(|parent| parent.schema == fact.schema && contains(parent.range, fact.range.start()))
-        .min_by_key(|parent| parent.range.len())
-        .map(|parent| &parent.state);
+        .collect::<Vec<_>>();
+    let shortest = states.iter().map(|entry| entry.range.len()).min();
+    let mut states = states
+        .into_iter()
+        .filter(|entry| Some(entry.range.len()) == shortest);
+    let state = states
+        .next()
+        .map(|entry| &entry.state)
+        .filter(|state| states.all(|entry| &entry.state == *state));
     let current = state.and_then(|state| state.current.first());
     let scope_name = |value: &hir::ScopeValue| match value {
         hir::ScopeValue::Known(scopes) => scopes
@@ -321,64 +335,35 @@ fn ir_field_hover(
         hir::ScopeValue::Unknown => "any".into(),
         hir::ScopeValue::Invalid => "invalid".into(),
     };
-    let mut values = Vec::new();
+    let applicable_fields = fields
+        .iter()
+        .copied()
+        .filter(|id| {
+            current.is_none_or(|current| {
+                ir.field(*id).scope.as_ref().is_none_or(|scope| {
+                    scope.scopes_in.is_empty()
+                        || crate::ir_semantic::scope_allows(ir, current, &scope.scopes_in)
+                })
+            })
+        })
+        .collect::<Vec<_>>();
     let mut documents = Vec::new();
-    let mut display_keys = std::collections::BTreeSet::new();
-    let mut scopes = Vec::new();
+    let mut display_keys = BTreeSet::new();
     for id in &fields {
         cancellation.checkpoint()?;
         let field = ir.field(*id);
         display_keys.extend(ir.field_localisation_keys(*id, key, word));
-        let value = match field.value {
-            rules::ir::FieldValue::Scalar(matcher) => crate::ir_semantic::describe(ir, matcher),
-            rules::ir::FieldValue::Block(schema) => {
-                format!("a `{}` block", ir.strings.resolve(ir.schema(schema).name))
-            }
-            rules::ir::FieldValue::SelfBlock => format!(
-                "a `{}` block",
-                ir.strings.resolve(ir.schema(fact.schema).name)
-            ),
-        };
-        let allowed = field.scope.as_ref().map(|scope| &scope.scopes_in);
-        let available = current.is_none_or(|current| {
-            allowed.is_none_or(|scopes| {
-                scopes.is_empty() || crate::ir_semantic::scope_allows(ir, current, scopes)
-            })
-        });
-        if key || available {
-            if fields.len() == 1
-                && let rules::ir::FieldValue::Scalar(matcher) = field.value
-                && let rules::ir::Matcher::Union(alternatives) = ir.matcher(matcher)
-            {
-                values.extend(alternatives.iter().map(|matcher| {
-                    (
-                        crate::ir_semantic::describe(ir, *matcher),
-                        allowed,
-                        available,
-                    )
-                }));
-            } else {
-                values.push((value, allowed, available));
-            }
-        }
         if let Some(doc) = field.doc {
             documents.push(ir.strings.resolve(doc).to_owned());
         }
         if field.deprecated {
             model.push_section("Deprecated".to_owned());
         }
-        if let Some(origin) = ir.provenance_of(*id) {
-            model.push_section(format!(
-                "Source: `{}` `{}`",
-                ir.strings.resolve(origin.file),
-                ir.strings.resolve(origin.pointer)
-            ));
-        }
         let query_matcher = if key {
             Some(field.key)
         } else {
             match field.value {
-                rules::ir::FieldValue::Scalar(matcher) => Some(matcher),
+                FieldValue::Scalar(matcher) => Some(matcher),
                 _ => None,
             }
         };
@@ -415,33 +400,11 @@ fn ir_field_hover(
                 if let Some(doc) = source_field.doc {
                     documents.push(ir.strings.resolve(doc).to_owned());
                 }
-                if let Some(origin) = ir.provenance_of(source) {
-                    model.push_section(format!(
-                        "Query source: `{}` `{}`",
-                        ir.strings.resolve(origin.file),
-                        ir.strings.resolve(origin.pointer)
-                    ));
-                }
-            }
-        }
-        if let Some(state) = state {
-            let next = hir::transition_ir_scope(ir, state.clone(), field.scope.as_ref(), word);
-            if next.current != state.current
-                || field
-                    .scope
-                    .as_ref()
-                    .is_some_and(|scope| scope.push.is_some() || !scope.set.is_empty())
-            {
-                let target = next
-                    .current
-                    .first()
-                    .map_or_else(|| "any".into(), scope_name);
-                scopes.push(format!("- `{word}` enters `{target}`"));
             }
         }
         if !key
-            && matches!(field.value, rules::ir::FieldValue::Scalar(matcher)
-            if matches!(ir.matcher(matcher), rules::ir::Matcher::Path(_)))
+            && matches!(field.value, FieldValue::Scalar(matcher)
+            if matches!(ir.matcher(matcher), Matcher::Path(_)))
         {
             let value = hir
                 .properties()
@@ -452,104 +415,253 @@ fn ir_field_hover(
             model.push_section(texture_resolution_section(snapshot, value));
         }
     }
-    if !key
+    let mut problem = None;
+    if let Some(current) = current
+        && applicable_fields.is_empty()
+    {
+        let required = fields
+            .iter()
+            .filter_map(|id| ir.field(*id).scope.as_ref())
+            .flat_map(|scope| scope.scopes_in.iter())
+            .map(|scope| ir.strings().resolve(*scope))
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .map(code_span)
+            .collect::<Vec<_>>()
+            .join(" or ");
+        problem = Some(format!(
+            "**Invalid scope.** {} requires {required}. Current scope is {}.",
+            code_span(property_key),
+            code_span(&scope_name(current)),
+        ));
+    } else if !key
         && let Some(scalar) = hir
             .properties()
             .iter()
             .filter_map(|property| property.scalar.as_ref())
             .find(|scalar| contains(scalar.range, position))
-        && !fields.iter().any(|id| match ir.field(*id).value {
-            rules::ir::FieldValue::Scalar(matcher) => match state {
-                Some(state) => crate::ir_semantic::matcher_matches_with_state(
-                    snapshot,
-                    ir,
-                    matcher,
-                    &scalar.value,
-                    &crate::ir_queries::SnapshotSymbolFacts { snapshot },
-                    state,
-                ),
-                None => crate::ir_semantic::matcher_matches_in_snapshot(
-                    snapshot,
-                    ir,
-                    matcher,
-                    &scalar.value,
-                    &crate::ir_queries::SnapshotSymbolFacts { snapshot },
-                ),
-            },
-            _ => true,
-        })
+        && !applicable_fields
+            .iter()
+            .any(|id| match ir.field(*id).value {
+                FieldValue::Scalar(matcher) => match state {
+                    Some(state) => crate::ir_semantic::matcher_matches_with_state(
+                        snapshot,
+                        ir,
+                        matcher,
+                        &scalar.value,
+                        &crate::ir_queries::SnapshotSymbolFacts { snapshot },
+                        state,
+                    ),
+                    None => crate::ir_semantic::matcher_matches_in_snapshot(
+                        snapshot,
+                        ir,
+                        matcher,
+                        &scalar.value,
+                        &crate::ir_queries::SnapshotSymbolFacts { snapshot },
+                    ),
+                },
+                _ => true,
+            })
     {
-        model.push_section("The current value does not match an allowed value type.".into());
+        let expected = applicable_fields
+            .iter()
+            .filter_map(|id| match ir.field(*id).value {
+                FieldValue::Scalar(matcher) => Some(crate::ir_semantic::describe(ir, matcher)),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>()
+            .join(" or ");
+        problem = Some(format!(
+            "**Invalid value.** {} must be {expected}.",
+            code_span(&scalar.value),
+        ));
     }
-    values.sort_by(|left, right| left.0.cmp(&right.0));
-    values.dedup();
-    let count = values.len();
-    let lines = values
-        .into_iter()
-        .map(|(value, allowed, available)| {
-            let scopes = allowed.filter(|scopes| !scopes.is_empty()).map(|scopes| {
-                scopes
-                    .iter()
-                    .map(|scope| code_span(ir.strings().resolve(*scope)))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            });
-            match scopes {
-                Some(scopes) if !available => format!(
-                    "- {value}; unavailable in current scope `{}`; valid scopes: {scopes}",
-                    current.map_or_else(|| "any".into(), scope_name)
-                ),
-                Some(scopes) => format!("- value: {value}\n- valid scopes: {scopes}"),
-                None => format!("- value: {value}"),
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    model.sections.insert(
-        0,
-        if count > 1 {
-            format!("#### Allowed value types ({count})\n\n{lines}")
-        } else {
-            lines
-        },
-    );
+    let key_fields = key.then(|| {
+        ir.lookup_key(fact.schema, property_key)
+            .filter(is_exact)
+            .collect::<Vec<_>>()
+    });
+    let displayed_fields = match key_fields.as_deref() {
+        Some(exact) if !exact.is_empty() => exact,
+        _ if key || applicable_fields.is_empty() => &fields,
+        _ => &applicable_fields,
+    };
+    model
+        .sections
+        .insert(0, value_scope_table(ir, displayed_fields));
+    if let Some(problem) = problem {
+        model.sections.insert(0, problem);
+    }
     let mut rows = Vec::new();
     for (label, key) in display_keys {
-        for (_, value) in
-            crate::localisation::localisation_previews_for_name(snapshot, &key, cancellation)?
-        {
-            if !value.is_empty() {
-                rows.push(crate::localisation::LocalisationPreviewRow {
-                    label: label.map(str::to_owned),
-                    value,
-                });
-            }
-        }
+        let previews =
+            crate::localisation::localisation_previews_for_name(snapshot, &key, cancellation)?;
+        rows.extend(crate::localisation::preview_rows(
+            snapshot,
+            label.map(str::to_owned),
+            &key,
+            &previews,
+            false,
+        ));
     }
-    if !rows.is_empty() {
-        model.push_section(crate::localisation::localisation_preview_section(&rows));
-        model.has_localisation_preview = true;
-    }
+    model.push_localisation(&rows);
     documents.sort();
     documents.dedup();
     for document in documents {
         let document = document.lines().collect::<Vec<_>>().join("  \n");
         model.push_section(format!("#### Documentation\n\n{document}"));
     }
-    if let Some(current) = current {
-        let here = scope_name(current);
-        if here != "any" || !scopes.is_empty() {
-            scopes.sort();
-            scopes.dedup();
-            model.push_section(format!(
-                "#### Scope\n\n- here: `{here}`{}",
-                if scopes.is_empty() {
-                    String::new()
-                } else {
-                    format!("\n{}", scopes.join("\n"))
-                }
-            ));
-        }
+    if let Some(scope) = scope_section(ir, hir, position) {
+        model.push_section(scope);
     }
     Ok(Some(model))
+}
+
+fn value_scope_table(ir: &RulesIr, fields: &[FieldId]) -> String {
+    // Collect every scope for each value before grouping rows. Shared alternatives
+    // then appear once without granting a scope access to the other alternatives.
+    let mut scopes_by_value = BTreeMap::<String, Option<BTreeSet<&str>>>::new();
+    for id in fields {
+        let field = ir.field(*id);
+        let scopes = field
+            .scope
+            .iter()
+            .flat_map(|scope| scope.scopes_in.iter())
+            .map(|scope| ir.strings().resolve(*scope))
+            .collect::<Vec<_>>();
+        let unrestricted = scopes.is_empty() || scopes.contains(&"any");
+        let mut add_value = |value| {
+            let allowed = scopes_by_value
+                .entry(value)
+                .or_insert_with(|| Some(BTreeSet::new()));
+            if unrestricted {
+                *allowed = None;
+            } else if let Some(allowed) = allowed {
+                allowed.extend(scopes.iter().copied());
+            }
+        };
+        match field.value {
+            FieldValue::Scalar(matcher) => match ir.matcher(matcher) {
+                Matcher::Union(alternatives) => {
+                    for alternative in alternatives {
+                        add_value(value_label(ir, *alternative));
+                    }
+                }
+                _ => add_value(value_label(ir, matcher)),
+            },
+            FieldValue::Block(_) | FieldValue::SelfBlock => add_value("script block".into()),
+        }
+    }
+
+    let mut values_by_scope = BTreeMap::<_, Vec<_>>::new();
+    for (value, scopes) in scopes_by_value {
+        values_by_scope.entry(scopes).or_default().push(value);
+    }
+    let mut lines = vec![
+        "| Valid scopes | Allowed values |".to_owned(),
+        "| --- | --- |".to_owned(),
+    ];
+    for (scopes, values) in values_by_scope {
+        let scopes = scopes.map_or_else(
+            || "Any".to_owned(),
+            |scopes| {
+                scopes
+                    .into_iter()
+                    .map(code_span)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            },
+        );
+        let values = values.join(" · ");
+        lines.push(format!(
+            "| {} | {} |",
+            table_cell(&scopes),
+            table_cell(&values)
+        ));
+    }
+    lines.join("\n")
+}
+
+fn value_label(ir: &RulesIr, matcher: MatcherId) -> String {
+    match ir.matcher(matcher) {
+        Matcher::Bool => "`yes` or `no`".to_owned(),
+        Matcher::Ref(RefTarget::Type {
+            type_id,
+            subtype: None,
+            ..
+        }) => code_span(ir.strings().resolve(ir.type_info(*type_id).name)),
+        _ => {
+            let label = crate::ir_semantic::describe(ir, matcher);
+            label
+                .strip_prefix("an ")
+                .or_else(|| label.strip_prefix("a "))
+                .map(str::to_owned)
+                .unwrap_or(label)
+        }
+    }
+}
+
+fn table_cell(text: &str) -> String {
+    text.replace(['\r', '\n'], " ").replace('|', "\\|")
+}
+
+/// Show only register types shared by every applicable scope at this position.
+pub(crate) fn scope_section(
+    ir: &rules::ir::RulesIr,
+    hir: &hir::HirFile,
+    position: TextSize,
+) -> Option<String> {
+    let body = hir.properties().iter().find_map(|property| {
+        (property.scalar.is_none() && contains(property.key_range, position))
+            .then_some(property.value_range)
+            .flatten()
+    });
+    let mut scopes = body.map_or_else(Vec::new, |body| {
+        hir.schema_facts()
+            .iter()
+            .filter(|fact| fact.range == body)
+            .collect()
+    });
+    let title = if scopes.is_empty() {
+        scopes = hir
+            .schema_facts()
+            .iter()
+            .filter(|fact| contains(fact.range, position))
+            .collect();
+        let shortest = scopes.iter().map(|fact| fact.range.len()).min()?;
+        scopes.retain(|fact| fact.range.len() == shortest);
+        "Scope at this position"
+    } else {
+        "Scope inside this block"
+    };
+    let known_register =
+        |state: &hir::ScopeState, name| match hir::ir_scope_register_value(ir, state, name) {
+            Some(hir::ScopeValue::Known(types))
+                if types.len() == 1 && types[0].as_ref() != "any" =>
+            {
+                Some(types[0].clone())
+            }
+            _ => None,
+        };
+    let first = &scopes.first()?.state;
+    let mut rows = Vec::new();
+    for name in ["ROOT", "FROM", "THIS", "PREV", "PREV_PREV"] {
+        if let Some(scope) = known_register(first, name)
+            && scopes
+                .iter()
+                .skip(1)
+                .all(|fact| known_register(&fact.state, name).as_ref() == Some(&scope))
+        {
+            let scope = table_cell(&code_span(&scope));
+            rows.push(format!("| `{name}` | {scope} |"));
+        }
+    }
+    (!rows.is_empty()).then(|| {
+        format!(
+            "#### {title}\n\n| Register | Scope |\n| --- | --- |\n{}",
+            rows.join("\n")
+        )
+    })
 }

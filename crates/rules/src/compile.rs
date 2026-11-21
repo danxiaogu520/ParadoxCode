@@ -667,6 +667,15 @@ impl<'a> Checker<'a> {
                     );
                 }
                 self.registers.insert(name.clone());
+                if register.chain_separator.is_some() && register.chain != Some(true) {
+                    report(
+                        &mut self.diagnostics,
+                        &at.child("chain_separator"),
+                        DiagnosticCode::ScopeReferenceError,
+                        Severity::Error,
+                        "a chain separator requires chain: true".to_owned(),
+                    );
+                }
                 if register.chain == Some(true)
                     && matches!(
                         register.role,

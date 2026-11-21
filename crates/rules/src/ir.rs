@@ -718,6 +718,23 @@ impl ScopeModel {
             if !register.chain {
                 return None;
             }
+            if let Some(separator) = register.chain_separator {
+                let mut rest = name;
+                let mut depth = 0;
+                while !base.is_empty()
+                    && rest
+                        .get(..base.len())
+                        .is_some_and(|part| part.eq_ignore_ascii_case(base))
+                {
+                    depth += 1;
+                    rest = &rest[base.len()..];
+                    if rest.is_empty() {
+                        return (depth > 1).then_some((register, depth));
+                    }
+                    rest = rest.strip_prefix(strings.resolve(separator))?;
+                }
+                return None;
+            }
             let mut base_bytes = base.bytes().filter(|byte| *byte != b'_');
             let first = base_bytes.next()?;
             let mut name_bytes = name.bytes().filter(|byte| *byte != b'_');
@@ -766,6 +783,8 @@ pub struct RegisterInfo {
     pub role: crate::source::RegisterRole,
     /// Whether the register chains (`prev_prev`, `fromfrom`, …).
     pub chain: bool,
+    /// Exact join spelling, if specified by the rule pack.
+    pub chain_separator: Option<Symbol>,
 }
 
 /// One scope link.
@@ -1826,6 +1845,7 @@ mod tests {
                 name,
                 role: crate::source::RegisterRole::Previous,
                 chain: true,
+                chain_separator: None,
             }]
             .into_boxed_slice();
             for candidate in [
@@ -1837,7 +1857,7 @@ mod tests {
                 "_ROOT_root_",
                 "prev",
                 "pre_v",
-                "PREVprev",
+                "prev_PREV",
                 "é",
                 "é_é",
                 "É",

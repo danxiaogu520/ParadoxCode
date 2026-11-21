@@ -10,7 +10,13 @@
         "ai_weight": {
           "body": "peace_treaty_body__ai_weight",
           "card": "1",
-          "doc": "Defaults to always evaluate to 0. Mandatory to have entry called \"ai_value\". Its value at the end of the ai_weight scope is what will be used"
+          "doc": "Defaults to always evaluate to 0. Mandatory to have entry called \"ai_value\". Its value at the end of the ai_weight scope is what will be used",
+          "scope": {
+            "set": {
+              "from": "country",
+              "this": "country"
+            }
+          }
         },
         "applies_to_war_target": {
           "card": "0..1",

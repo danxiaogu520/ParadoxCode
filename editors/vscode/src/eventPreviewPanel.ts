@@ -11,6 +11,12 @@ export interface PreviewTarget {
     kind: 'event' | 'mission';
     id: string;
     title?: string;
+    titleSource?: { key: string; location: Location };
+    missingLocalisation?: string[];
+    language?: string;
+    eventType?: string;
+    sourceName?: string;
+    prerequisiteIssues?: [string, boolean][];
     location: Location;
     path?: string;
 }
@@ -19,7 +25,18 @@ export function parsePreviewTarget(value: unknown): PreviewTarget | undefined {
     const t = value as Partial<PreviewTarget> | undefined;
     if (!t || (t.kind !== 'event' && t.kind !== 'mission') || !t.id || typeof t.id !== 'string'
         || !isPreviewLocation(t.location) || !t.location.uri.startsWith('file:')) return undefined;
-    return { kind: t.kind, id: t.id, title: typeof t.title === 'string' ? t.title : undefined,
+    const source = t.titleSource;
+    const titleSource = source && typeof source.key === 'string' && isPreviewLocation(source.location)
+        && /^(?:file|pdcloc):/.test(source.location.uri) ? source : undefined;
+    const missingLocalisation = Array.isArray(t.missingLocalisation)
+        ? t.missingLocalisation.filter(key => typeof key === 'string') : undefined;
+    const prerequisiteIssues = Array.isArray(t.prerequisiteIssues)
+        ? t.prerequisiteIssues.filter(issue => Array.isArray(issue) && typeof issue[0] === 'string'
+            && typeof issue[1] === 'boolean') : undefined;
+    return { kind: t.kind, id: t.id, title: typeof t.title === 'string' ? t.title : undefined, titleSource,
+        language: typeof t.language === 'string' ? t.language : undefined, missingLocalisation, prerequisiteIssues,
+        eventType: typeof t.eventType === 'string' ? t.eventType : undefined,
+        sourceName: typeof t.sourceName === 'string' ? t.sourceName : undefined,
         location: { ...t.location, uri: vscode.Uri.parse(t.location.uri).toString() },
         path: typeof t.path === 'string' ? t.path : undefined };
 }

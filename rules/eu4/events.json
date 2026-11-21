@@ -3139,7 +3139,7 @@
           "doc": "ROOT is the country receiving development; FROM is the country it was transferred from. Normal concentration may leave FROM unset.",
           "scope": {
             "set": {
-              "from": "country",
+              "from": "any",
               "root": "country",
               "this": "country"
             }

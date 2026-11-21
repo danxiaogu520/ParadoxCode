@@ -9,6 +9,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- EU4 script hover groups allowed values by their valid scopes and shows known scope registers
+  in a separate table. Definition and localisation links open the referenced line, including
+  localisation in automatically decoded editors.
+
 - EU4 script hovers and Go to Definition resolve more localisation, including country names
   and adjectives, technology levels, modifier labels, diplomatic attitudes, music and tutorials.
   Scripted localisation is indexed by its declared function name. Its branches link to

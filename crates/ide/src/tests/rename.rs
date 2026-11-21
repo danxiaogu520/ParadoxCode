@@ -75,6 +75,7 @@ fn rename_rejects_dependency_and_vanilla_definitions() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
         id: SourceRootId::new(1),
         kind: SourceRootKind::Dependency,
+        name: None,
         path: AbsPath::normalize(&root.join("dependency")),
         order: 0,
         writable: false,

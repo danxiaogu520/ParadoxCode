@@ -41,7 +41,9 @@ export interface HoverCardAssetWire {
     sprite?: string;
     /** Absolute path on this machine; the client only reads and decodes. */
     path: string;
+    logicalPath?: string;
     rootKind: 'project' | 'dependency' | 'vanilla';
+    sourceName?: string;
     extensionFallback: boolean;
     /** Entry inside the DLC zip that `path` names; packed members cannot be decoded. */
     archiveMember?: string;
@@ -795,7 +797,9 @@ function parseAsset(value: unknown): HoverCardAssetWire | undefined {
     return {
         sprite: typeof record.sprite === 'string' ? record.sprite : undefined,
         path: record.path,
+        logicalPath: typeof record.logicalPath === 'string' ? record.logicalPath : undefined,
         rootKind: rootKind === 'project' || rootKind === 'dependency' || rootKind === 'vanilla' ? rootKind : 'vanilla',
+        sourceName: typeof record.sourceName === 'string' ? record.sourceName : undefined,
         extensionFallback: record.extensionFallback === true,
         archiveMember: typeof archiveMember === 'string' && archiveMember !== '' ? archiveMember : undefined,
         frames: typeof frames === 'number' && frames >= 1 ? Math.floor(frames) : undefined,

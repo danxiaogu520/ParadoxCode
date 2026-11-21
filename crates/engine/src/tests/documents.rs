@@ -996,6 +996,7 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
         SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::Vanilla,
+            name: None,
             path: AbsPath::normalize(&vanilla),
             order: 0,
             writable: false,
@@ -1003,6 +1004,7 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
         SourceRoot {
             id: SourceRootId::new(2),
             kind: SourceRootKind::Dependency,
+            name: None,
             path: AbsPath::normalize(&dependency),
             order: 1,
             writable: false,
@@ -1010,6 +1012,7 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
         SourceRoot {
             id: SourceRootId::new(3),
             kind: SourceRootKind::Project,
+            name: None,
             path: AbsPath::normalize(&current),
             order: 2,
             writable: true,

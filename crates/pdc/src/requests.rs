@@ -1519,11 +1519,38 @@ impl SnapshotRequestContext {
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
         self.ensure_active()?;
+        let mut contents = value.contents;
+        for link in value.links {
+            let placeholder = format!("[{}]({})", link.label, link.destination);
+            let rendered = location_to_lsp(&self.snapshot, &link.location)
+                .filter(|location| {
+                    let uri = location.uri.as_str();
+                    uri.starts_with("file:") || uri.starts_with("pdcloc:")
+                })
+                .map_or_else(
+                    || link.label.clone(),
+                    |location| {
+                        let uri = location
+                            .uri
+                            .as_str()
+                            .replace('(', "%28")
+                            .replace(')', "%29");
+                        let start = location.range.start;
+                        format!(
+                            "[{}]({uri}#L{},{})",
+                            link.label,
+                            start.line + 1,
+                            start.character + 1
+                        )
+                    },
+                );
+            contents = contents.replace(&placeholder, &rendered);
+        }
         let mut response = typed_value(
             LspHover {
                 contents: HoverContents::Markup(MarkupContent {
                     kind: MarkupKind::Markdown,
-                    value: value.contents,
+                    value: contents,
                 }),
                 range: value
                     .range
@@ -1534,8 +1561,19 @@ impl SnapshotRequestContext {
         if let Some(target) = value.preview
             && let Some(location) = location_to_lsp(&self.snapshot, &target.location)
         {
-            response["pdcPreview"] = json!({"kind": target.kind, "id": target.id, "title": target.title, "location": location,
-                "path": target.location.path.as_ref().map(|p| p.as_str())});
+            let title_source = target.title_source.as_ref().and_then(|(key, location)| {
+                Some(json!({"key": key, "location": location_to_lsp(&self.snapshot, location)?}))
+            });
+            response["pdcPreview"] = json!({
+                "kind": target.kind, "id": target.id, "title": target.title, "location": location,
+                "path": target.location.path.as_ref().map(|p| p.as_str()),
+                "titleSource": title_source,
+                "missingLocalisation": target.missing_localisation,
+                "language": self.snapshot.localisation_preview_language(),
+                "eventType": target.event_type,
+                "sourceName": target.source_name,
+                "prerequisiteIssues": target.prerequisite_issues,
+            });
         }
         Ok(response)
     }
@@ -1594,7 +1632,9 @@ impl SnapshotRequestContext {
             json!({
                 "sprite": asset.sprite,
                 "path": asset.path,
+                "logicalPath": asset.logical_path,
                 "rootKind": asset.root_kind,
+                "sourceName": asset.source_name,
                 "extensionFallback": asset.extension_fallback,
                 "archiveMember": asset.archive_member,
                 "frames": asset.frames,

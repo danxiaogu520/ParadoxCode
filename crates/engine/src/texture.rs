@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use text::AbsPath;
-use vfs::{SourceRoot, SourceRootKind};
+use vfs::{SourceRoot, SourceRootId, SourceRootKind};
 
 /// Top-level directories of each source root harvested into the catalog.
 const CATALOG_DIRECTORIES: &[&str] = &["gfx", "tutorial"];
@@ -42,6 +42,8 @@ const MAX_ZIP_CENTRAL_DIRECTORY: u32 = 16 * 1024 * 1024;
 /// One source-root hit for a normalized asset path.
 #[derive(Clone, Debug)]
 pub struct TextureCatalogHit {
+    /// Source root providing the file.
+    pub root_id: SourceRootId,
     /// Kind of the source root providing the file.
     pub root_kind: SourceRootKind,
     /// Physical path of the file, absolute. For a DLC archive member this is
@@ -57,6 +59,8 @@ pub struct TextureCatalogHit {
 pub struct TextureResolution {
     /// The root that provides the file.
     pub hit: TextureCatalogHit,
+    /// The game-relative path whose file was actually found.
+    pub logical_path: String,
     /// The extension drift fallback (`.tga` referenced while `.dds` ships, or the
     /// reverse) was applied; the referenced spelling itself has no file.
     pub extension_fallback: bool,
@@ -162,6 +166,7 @@ impl TextureCatalog {
                 .cloned()
                 .map(|hit| TextureResolution {
                     hit,
+                    logical_path: key.to_owned(),
                     extension_fallback: key != normalized,
                 })
         };
@@ -181,6 +186,7 @@ impl TextureCatalog {
                 .iter()
                 .find(|root| root.path.as_path().join(&probe).is_file())
                 .map(|root| TextureCatalogHit {
+                    root_id: root.id,
                     root_kind: root.kind,
                     path: AbsPath::normalize(&root.path.as_path().join(&probe)),
                     archive_member: None,
@@ -189,6 +195,7 @@ impl TextureCatalog {
                 return Some(TextureResolution {
                     hit,
                     extension_fallback: probe != normalized,
+                    logical_path: probe,
                 });
             }
             probe = extension_fallback(&probe)?;
@@ -363,6 +370,7 @@ fn collect_directory(
             catalog.insert(
                 key.to_ascii_lowercase(),
                 TextureCatalogHit {
+                    root_id: root.id,
                     root_kind: root.kind,
                     path: AbsPath::normalize(&entry.path()),
                     archive_member: None,
@@ -410,6 +418,7 @@ fn collect_zip_archive(catalog: &mut TextureCatalog, root: &SourceRoot, path: &s
         catalog.insert(
             normalized.to_owned(),
             TextureCatalogHit {
+                root_id: root.id,
                 root_kind: root.kind,
                 path: AbsPath::normalize(path),
                 archive_member: Some(name),

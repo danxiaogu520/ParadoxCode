@@ -404,6 +404,18 @@ suite('ParadoxCode VS Code extension host', () => {
       const eventHover = await hoverAt(caller, 'preview_host.1');
       const event = action(eventHover, 'paradoxcode.previewEvent');
       assert.equal(event.title, 'Title One', JSON.stringify(eventHover));
+      assert.equal(event.eventType, 'country_event');
+      assert.equal(event.titleSource.key, 'host_preview_title');
+      assert.deepEqual(event.missingLocalisation, ['host_preview_desc']);
+      const titleLink = action(eventHover, 'paradoxcode.localisation.openHoverSource');
+      assert.equal(vscode.Uri.parse(titleLink).fragment, 'L2,2');
+      await vscode.commands.executeCommand('paradoxcode.localisation.openHoverSource', titleLink);
+      const titleEditor = vscode.window.activeTextEditor;
+      assert.equal(titleEditor.document.uri.scheme, 'pdcloc');
+      assert.equal(titleEditor.document.uri.fsPath, loc.uri.fsPath);
+      assert.equal(titleEditor.selection.active.line, 1);
+      assert.equal(titleEditor.selection.active.character, 1);
+      await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
       assert.ok(eventHover.some(text => text.replaceAll('&nbsp;', ' ').includes('Title One')), JSON.stringify(eventHover));
       assert.equal(vscode.Uri.parse(event.location.uri).fsPath, source.uri.fsPath);
       const m = action(await hoverAt(missions, 'host_upstream'), 'paradoxcode.locateMission');

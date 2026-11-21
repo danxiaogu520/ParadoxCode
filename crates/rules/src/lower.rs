@@ -703,6 +703,10 @@ impl<'a> Lowering<'a> {
                 name,
                 role: register.role,
                 chain: register.chain.unwrap_or(false),
+                chain_separator: register
+                    .chain_separator
+                    .as_deref()
+                    .map(|separator| self.strings.intern_verbatim(separator)),
             });
         }
         self.scopes.registers = registers.into_boxed_slice();

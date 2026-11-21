@@ -169,7 +169,7 @@ fn field_queries_complete_seven_dynamic_modifier_families_with_source_navigation
         "{}",
         value.contents
     );
-    assert!(value.contents.contains("patterns/0"), "{}", value.contents);
+    assert!(!value.contents.contains("patterns/0"), "{}", value.contents);
 }
 
 #[test]
@@ -555,7 +555,7 @@ fn field_queries_pattern_holes_keep_sibling_context_docs_and_navigation() {
     .unwrap();
     assert!(
         description.contents.contains("Boolean trigger source.")
-            && description.contents.contains("Query source:"),
+            && !description.contents.contains("Query source:"),
         "{}",
         description.contents
     );

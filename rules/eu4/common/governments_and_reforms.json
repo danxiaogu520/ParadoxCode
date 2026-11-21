@@ -323,12 +323,24 @@
         "on_max_reached": {
           "body": "effect",
           "card": "0..1",
-          "override": true
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         },
         "on_min_reached": {
           "body": "effect",
           "card": "0..1",
-          "override": true
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         },
         "range_modifier": {
           "body": "government_mechanic_body__powers__government_mechanic_power__range_modifier",
@@ -379,7 +391,13 @@
         "trigger": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Block of trigger conditions; all must hold for the containing entry to apply."
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         }
       }
     },
@@ -408,7 +426,13 @@
         "trigger": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Block of trigger conditions; all must hold for the containing entry to apply."
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         }
       }
     },
@@ -432,7 +456,13 @@
         "trigger": {
           "body": "trigger",
           "card": "0..1",
-          "doc": "Block of trigger conditions; all must hold for the containing entry to apply."
+          "doc": "Block of trigger conditions; all must hold for the containing entry to apply.",
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         }
       }
     },
@@ -1087,7 +1117,13 @@
         "post_removed_effect": {
           "body": "effect",
           "card": "0..1",
-          "override": true
+          "override": true,
+          "scope": {
+            "set": {
+              "root": "country",
+              "this": "country"
+            }
+          }
         },
         "potential": {
           "body": "trigger",
