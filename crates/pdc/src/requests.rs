@@ -354,6 +354,7 @@ impl SnapshotRequestContext {
             "pdc/transcodeEncode" => self.transcode_encode(params),
             "pdc/missionPreview" => self.mission_preview(params),
             "pdc/hoverCard" => self.hover_card(params),
+            "pdc/eventPreview" => self.event_preview(params),
             "pdc/ruleSearch" => self.rule_search(params),
             "pdc/localisationSearch" => self.localisation_search(params),
             "pdc/symbolSearch" => self.symbol_search(params),
@@ -1519,7 +1520,7 @@ impl SnapshotRequestContext {
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
         self.ensure_active()?;
-        typed_value(
+        let mut response = typed_value(
             LspHover {
                 contents: HoverContents::Markup(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -1530,7 +1531,14 @@ impl SnapshotRequestContext {
                     .map(|range| range_to_lsp(document.line_index(), document.text(), range)),
             },
             "hover response",
-        )
+        )?;
+        if let Some(target) = value.preview
+            && let Some(location) = location_to_lsp(&self.snapshot, &target.location)
+        {
+            response["pdcPreview"] = json!({"kind": target.kind, "id": target.id, "title": target.title, "location": location,
+                "path": target.location.path.as_ref().map(|p| p.as_str())});
+        }
+        Ok(response)
     }
 
     /// Structured hover-card payload for the extension's rendered previews:
@@ -1546,10 +1554,41 @@ impl SnapshotRequestContext {
     fn hover_card(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let (id, position) = self.document_position(params)?;
         self.ensure_active()?;
-        let Some(card) =
-            ide::hover_card_with_cancellation(&self.snapshot, &id, position, &self.cancellation)
-                .map_err(cancelled_error)?
-        else {
+        let resolve = if params
+            .and_then(|p| p.get("textureOnly"))
+            .and_then(Value::as_bool)
+            == Some(true)
+        {
+            ide::texture_preview_with_cancellation
+        } else {
+            ide::hover_card_with_cancellation
+        };
+        let card =
+            resolve(&self.snapshot, &id, position, &self.cancellation).map_err(cancelled_error)?;
+        self.card_response(card)
+    }
+
+    fn event_preview(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct EventPreviewParams {
+            text_document: lsp_types::TextDocumentIdentifier,
+            id: String,
+        }
+        let params = typed_params::<EventPreviewParams>(params, "event preview")?;
+        let document = DocumentId::new(params.text_document.uri.as_str());
+        let card = ide::event_preview_with_cancellation(
+            &self.snapshot,
+            &document,
+            &params.id,
+            &self.cancellation,
+        )
+        .map_err(cancelled_error)?;
+        self.card_response(card)
+    }
+
+    fn card_response(&self, card: Option<ide::HoverCard>) -> Result<Value, RpcError> {
+        let Some(card) = card else {
             return Ok(Value::Null);
         };
         let asset_json = |asset: &ide::HoverCardAsset| {
@@ -1582,6 +1621,8 @@ impl SnapshotRequestContext {
         }
         if let Some(event) = card.event.as_ref() {
             card_json["event"] = json!({
+                "sources": event.sources.iter().filter_map(|(k,l)| Some((k, location_to_lsp(&self.snapshot,l)?))).collect::<BTreeMap<_,_>>(),
+                "conditionalDesc": event.conditional_desc.as_ref().and_then(|l| location_to_lsp(&self.snapshot,l)),
                 "id": event.id,
                 "picture": event.picture,
                 "titleKey": event.title_key,

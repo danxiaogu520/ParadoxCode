@@ -1,4 +1,10 @@
 {
+  "Preview Event": "预览事件",
+  "Locate in Mission Tree": "在任务树中定位",
+  "Conditional description — open script": "按条件选择描述，点击查看脚本",
+  "Loading event preview…": "正在加载事件预览…",
+  "Mission {0} is no longer at this location.": "此位置已找不到任务 {0}。",
+  "Event {0} could not be found unambiguously in its source file.": "无法在源文件中唯一定位事件 {0}。",
   " · series hidden": " · 系列已隐藏",
   "A dependency named {0} already exists.": "名为 {0} 的依赖已存在。",
   "All": "全部",

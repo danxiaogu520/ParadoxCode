@@ -14,6 +14,7 @@ import { join } from 'path';
 import { pathToFileURL } from 'url';
 
 import { BmChar, DecodedImage, FontBook, FontRaster } from './gameAssets';
+import type { Location } from 'vscode-languageserver-protocol';
 
 interface LocFormatApi {
     parseLocFormat(text: string): { segments: { text: string; color: string | null }[]; plain: string };
@@ -22,6 +23,8 @@ interface LocFormatApi {
 // The §-colour parser ships as a UMD the webview loads via <script>; from
 // the compiled out/ directory the same file is one plain require away.
 const locFormat = require('../media/loc-format') as LocFormatApi;
+
+export const parseLocFormat = locFormat.parseLocFormat;
 
 // --- wire types -------------------------------------------------------------
 
@@ -51,6 +54,8 @@ export interface HoverCardEventOptionWire {
 }
 
 export interface HoverCardEventWire {
+    sources?: Record<string, Location>;
+    conditionalDesc?: Location;
     id: string;
     picture?: string | null;
     /** Present only when the event declares a scalar `title`; no key is fabricated. */
@@ -551,7 +556,8 @@ function eventFont(event: HoverCardEventWire, fonts: FontBook): FontRaster | nul
  * chrome tiles) to fit any length. § colours apply as authored; without a
  * usable font the card degrades to chrome + picture only.
  */
-export function composeEventCard(event: HoverCardEventWire, parts: EventCardParts): DecodedImage {
+export function composeEventCard(event: HoverCardEventWire, parts: EventCardParts,
+    region?: (key: string, label: string, top: number, height: number) => void): DecodedImage | undefined {
     const fonts = parts.fonts ?? {};
     const font = eventFont(event, fonts);
     const lineHeight = font ? font.lineHeight : 0;
@@ -560,6 +566,10 @@ export function composeEventCard(event: HoverCardEventWire, parts: EventCardPart
         : [];
     const descBottom = EVENT_DESC_Y + descLines.length * lineHeight;
     const optionsStart = Math.max(descBottom, EVENT_DESC_Y) + EVENT_OPTIONS_GAP;
+    if (event.titleKey) region?.(event.titleKey, event.title?.value || event.titleKey, EVENT_TITLE_Y, lineHeight);
+    if (event.descKey) region?.(event.descKey, event.desc?.value || event.descKey, EVENT_DESC_Y, descLines.length * lineHeight);
+    event.options.forEach((opt, i) => region?.(opt.nameKey, opt.name?.value || opt.nameKey,
+        optionsStart + i * EVENT_OPTION_STRIDE, EVENT_OPTION_HEIGHT));
     const optionsBottom = optionsStart + event.options.length * EVENT_OPTION_STRIDE;
     const bottoms = [parts.backgroundBottomS, parts.backgroundBottomM, parts.backgroundBottomL];
     const preferred = event.options.length <= 2 ? 0 : event.options.length <= 4 ? 1 : 2;
@@ -569,6 +579,9 @@ export function composeEventCard(event: HoverCardEventWire, parts: EventCardPart
         parts.picture ? EVENT_PICTURE_Y + parts.picture.height : 0,
         optionsBottom + (bottom?.height ?? 8),
     );
+    // A long description or a modded font can produce a very tall bitmap.
+    // Let the panel render the complete text with native wrapping in that case.
+    if (height > 4096) return undefined;
     const card = blankImage(EVENT_WIDTH, height);
     if (parts.backgroundTop) {
         blit(card, EVENT_BG_X, EVENT_BG_TOP_Y, parts.backgroundTop);
@@ -854,6 +867,8 @@ export function parseHoverCardResponse(value: unknown): HoverCardResponseWire | 
             }
         }
         event = {
+            sources: Object.fromEntries(Object.entries(record.sources ?? {}).filter(([, value]) => isPreviewLocation(value))),
+            conditionalDesc: isPreviewLocation(record.conditionalDesc) ? record.conditionalDesc : undefined,
             id: record.id,
             picture: typeof record.picture === 'string' ? record.picture : undefined,
             titleKey: typeof record.titleKey === 'string' ? record.titleKey : undefined,
@@ -888,4 +903,12 @@ export function parseHoverCardResponse(value: unknown): HoverCardResponseWire | 
         };
     }
     return { version: 1, card: { kind, asset, mission, event, cardAssets } };
+}
+
+export function isPreviewLocation(value: unknown): value is Location {
+    const loc = value as Partial<Location> | null;
+    const pos = (p: { line: number; character: number } | undefined) =>
+        !!p && Number.isSafeInteger(p.line) && p.line >= 0 && Number.isSafeInteger(p.character) && p.character >= 0;
+    return typeof loc?.uri === 'string' && /^(file|pdcloc):/.test(loc.uri)
+        && pos(loc.range?.start) && pos(loc.range?.end);
 }

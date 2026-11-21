@@ -696,9 +696,24 @@ pub struct CompletionResult {
     pub coverage: hir::analysis::AnalysisCoverage,
 }
 
+/// A resolved symbol an editor can preview on demand.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PreviewTarget {
+    /// Localised title already resolved for the text hover, when present.
+    pub title: Option<String>,
+    /// Event or mission symbol kind.
+    pub kind: String,
+    /// Identity within the definition file.
+    pub id: String,
+    /// Definition's selection range and source.
+    pub location: Location,
+}
+
 /// Hover information returned by the query layer.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Hover {
+    /// Optional navigation action. Resolving this never loads visual assets.
+    pub preview: Option<PreviewTarget>,
     /// Plain-text content; clients may render it as Markdown.
     pub contents: String,
     /// Token range that produced the hover.

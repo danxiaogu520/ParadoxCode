@@ -763,7 +763,13 @@ function tgaHeader(width, height, bpp, descriptor) {
     };
 
     {
-        const card = cards.composeEventCard(event, { ...parts, fonts });
+        const regions = [];
+        const card = cards.composeEventCard({ ...event, descKey: 'demo.1.d' }, { ...parts, fonts },
+            (key, _label, top, height) => regions.push([key, top, height]));
+        assert.deepEqual(regions, [
+            ['demo.1.t', 39, 10], ['demo.1.d', 230, 10], ['demo.1.a', 254, 31], ['demo.1.b', 286, 31],
+        ]);
+        assert.equal(cards.composeEventCard({ ...event, options: Array(140).fill(event.options[0]) }, { fonts }), undefined);
         assert.equal(card.width, 564);
         // 1 desc line (10px) -> options 254..317 -> bottom S (40) -> 358.
         assert.equal(card.height, 358);

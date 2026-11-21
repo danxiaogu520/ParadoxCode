@@ -91,11 +91,11 @@ export function createRenderer(script) {
     }, { get: (target, name) => target[name] ?? (() => {}) });
     class Element {
         constructor() {
-            this.dataset = {}; this.style = {}; this.value = ''; this.children = [];
+            this.dataset = {}; this.style = {}; this.value = ''; this.children = []; this.events = new Map();
             this.clientWidth = 1600; this.clientHeight = 1600;
             this.classList = { add() {}, remove() {}, toggle() {} };
         }
-        addEventListener() {}
+        addEventListener(name, fn) { this.events.set(name, fn); }
         setAttribute() {}
         append(...children) { this.children.push(...children); }
         appendChild(child) { this.append(child); }
@@ -126,6 +126,7 @@ export function createRenderer(script) {
     const flush = () => { while (frames.length) frames.shift()(); };
     flush();
     return {
+        click: id => { elements.get(id).events.get('click')({}); flush(); },
         message: data => { handlers.get('message')({ data }); flush(); },
         resize: () => { handlers.get('resize')(); flush(); },
         painted, get measures() { return measures; },
@@ -150,3 +151,56 @@ const beforeResize = view.measures;
 view.resize();
 assert.ok(view.measures - beforeResize >= firstMeasurements, 'theme/viewport changes invalidate title layouts');
 console.log('mission preview title layout checks passed');
+
+const focusPayload = { ...payload, nodes: [{ ...nodes[0], x: 3000, title: { value: 'Zed' } }],
+    groups: [{ tree: 0, label: 'branch', x: 0, y: 0 }] };
+view.message({ type: 'preview', payload: focusPayload });
+view.painted.length = 0;
+view.click('series-none');
+assert.ok(!view.painted.some(([text]) => text === 'Zed'));
+view.message({ type: 'preview', payload: focusPayload, focusMission: 0 });
+assert.ok(view.painted.some(([text, x, y]) => text === 'Zed' && Math.abs(x - 800) < 100 && Math.abs(y - 800) < 100),
+    'locating a node reveals its hidden series and centers it on the canvas');
+
+// Exercise the event panel's actual webview navigation (including the text-only fallback).
+{
+    const htmlLocation = { uri: 'file:///mod/localisation/a.yml', range: { start: { line: 3, character: 2 }, end: { line: 3, character: 5 } } };
+    const eventLocation = { ...htmlLocation, uri: 'file:///mod/events/a.txt' };
+    const received = {};
+    const listen = name => callback => { received[name] = callback; return { dispose() { delete received[name]; } }; };
+    const panel = { visible: true, viewColumn: 2, webview: { html: '', onDidReceiveMessage: listen('message') },
+        onDidDispose: listen('close'), onDidChangeViewState: listen('visible'), dispose() { received.close(); } };
+    const uri = value => ({ toString: () => value });
+    let opened;
+    const api = { ...vscode, Uri: { parse: uri }, ViewColumn: { One: 1, Beside: -2 },
+        Position: class { constructor(line, character) { Object.assign(this, { line, character }); } },
+        Range: class { constructor(start, end) { Object.assign(this, { start, end }); } },
+        workspace: { openTextDocument: async uri => ({ uri }), onDidChangeTextDocument: listen('edit') },
+        window: { createWebviewPanel: () => panel, visibleTextEditors: [], showTextDocument(doc, options) { opened = { doc, options }; } } };
+    const exports = {};
+    const card = { kind: 'event', event: { id: 'a.1', titleKey: 'a.t', title: { value: '<Title>' },
+        descKey: 'a.d', desc: { value: 'Description' }, conditionalDesc: eventLocation,
+        sources: { 'a.t': htmlLocation, 'a.d': htmlLocation }, options: [] } };
+    const imports = id => {
+        if (id === 'vscode') return api;
+        if (id === './previewPanel') return { MissionPreviewPanel: { store: () => ({ loadFontRasters: () => ({}) }) } };
+        if (id === './hoverCards') return realRequire(join(extension, 'out/hoverCards.js'));
+        if (id === './transparentLoc') return { openTextDocumentForNavigation: async uri => ({ uri }) };
+        if (id === './gameAssets') return {};
+        return realRequire(id);
+    };
+    runInNewContext(readFileSync(join(extension, 'out/eventPreviewPanel.js'), 'utf8'),
+        { exports, require: imports, setTimeout, clearTimeout });
+    const controller = new exports.EventPreviewPanel(() => ({ sendRequest: async () => ({ version: 1, card }) }));
+    await controller.show({ kind: 'event', id: 'a.1', location: eventLocation });
+    assert.ok(panel.webview.html.includes('&lt;Title&gt;'));
+    assert.ok(panel.webview.html.includes('Conditional description'));
+    const generation = Number(panel.webview.html.match(/generation:(\d+)/)[1]);
+    await received.message({ generation, index: 1 });
+    assert.equal(opened.doc.uri.toString(), htmlLocation.uri);
+    assert.equal(opened.options.selection.start.line, 3);
+    await received.message({ generation, index: 2 });
+    assert.equal(opened.doc.uri.toString(), eventLocation.uri);
+    controller.dispose();
+    assert.equal(received.edit, undefined);
+}

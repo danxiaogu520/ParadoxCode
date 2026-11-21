@@ -190,7 +190,7 @@ EU4 installation root containing eu4.exe. Used for mission textures and as the e
 
 ### `paradoxcode.hover.eventCard`
 
-Render a game-style event window (background chrome, picture banner, title, description, option buttons) when hovering an event inside an `events/` file. Texture paths come from the server's index; the card composes with the same fonts as the mission tree preview.
+Show Preview Event on event definition and reference hovers. Open it to inspect the event beside the editor.
 
 ```json
 {
@@ -201,7 +201,7 @@ Render a game-style event window (background chrome, picture banner, title, desc
 
 ### `paradoxcode.hover.missionCard`
 
-Render a game-style mission card (frame, icon, trigger and reward markers, bitmap-font title) when hovering a mission inside a mission file. Texture paths come from the server's index; the card composes with the same fonts as the mission tree preview.
+Show Locate in Mission Tree on mission definition and reference hovers.
 
 ```json
 {
