@@ -381,6 +381,9 @@ pub struct Field {
     pub severity: Severity,
     /// Whether the field is deprecated.
     pub deprecated: bool,
+    /// Whether using a deprecated field produces a diagnostic. Defaults to true.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deprecation_diagnostic: Option<bool>,
     /// Explicit opt-in metadata for schema-query capability filters.
     #[serde(default)]
     pub capabilities: Box<[Symbol]>,

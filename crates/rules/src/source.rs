@@ -258,6 +258,9 @@ pub struct FieldSpec {
     /// Whether the field is deprecated.
     #[serde(default)]
     pub deprecated: Option<bool>,
+    /// Whether using a deprecated field produces a diagnostic. Defaults to true.
+    #[serde(default)]
+    pub deprecation_diagnostic: Option<bool>,
     /// Explicit opt-in tags used by schema-query capability filters.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub capabilities: Vec<String>,
@@ -802,6 +805,7 @@ mod tests {
                 doc: None,
                 severity: None,
                 deprecated: None,
+                deprecation_diagnostic: None,
                 override_field: None,
                 capabilities: Vec::new(),
             }))

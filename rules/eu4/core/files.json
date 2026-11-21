@@ -1240,7 +1240,10 @@
       "fields": {
         "pre_dharma_mapping": {
           "body": "pre_dharma_mapping_body",
-          "card": "0..1"
+          "card": "0..1",
+          "deprecated": true,
+          "deprecation_diagnostic": false,
+          "doc": "Maps government identifiers from pre-Dharma saves."
         }
       },
       "patterns": [
@@ -2191,7 +2194,9 @@
         },
         "legacy_government": {
           "card": "1",
-          "value": "ref<government_reform> | enum<hardcoded_legacygovernments>"
+          "deprecated": true,
+          "deprecation_diagnostic": false,
+          "value": "scalar"
         }
       }
     },

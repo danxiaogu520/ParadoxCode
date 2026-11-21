@@ -24,7 +24,9 @@
         },
         "legacy_government": {
           "card": "0..1",
-          "list": "ref<government_reform> | enum<hardcoded_legacygovernments>",
+          "deprecated": true,
+          "deprecation_diagnostic": false,
+          "list": "scalar",
           "override": true
         },
         "native_council": {
@@ -58,16 +60,12 @@
           "card": "1",
           "value": "ref<government>"
         },
-        "legacy_government": [
-          {
-            "card": "1",
-            "value": "ref<government_reform>"
-          },
-          {
-            "card": "0..*",
-            "value": "enum<hardcoded_legacygovernments>"
-          }
-        ]
+        "legacy_government": {
+          "card": "1..*",
+          "deprecated": true,
+          "deprecation_diagnostic": false,
+          "value": "scalar"
+        }
       }
     },
     "government_body__color": {
@@ -90,13 +88,12 @@
         },
         "legacy_government": {
           "card": "1",
-          "value": "ref<government_reform>"
+          "deprecated": true,
+          "deprecation_diagnostic": false,
+          "value": "scalar"
         }
       },
-      "items": "enum<hardcoded_legacygovernments>"
-    },
-    "government_body__legacy_government": {
-      "items": "ref<government_reform> | enum<hardcoded_legacygovernments>"
+      "items": "scalar"
     },
     "government_body__native_council": {
       "fields": {
@@ -104,16 +101,12 @@
           "card": "1",
           "value": "ref<government>"
         },
-        "legacy_government": [
-          {
-            "card": "1",
-            "value": "ref<government_reform>"
-          },
-          {
-            "card": "0..*",
-            "value": "enum<hardcoded_legacygovernments>"
-          }
-        ]
+        "legacy_government": {
+          "card": "1..*",
+          "deprecated": true,
+          "deprecation_diagnostic": false,
+          "value": "scalar"
+        }
       }
     },
     "government_body__tribal_democracy": {
@@ -122,16 +115,12 @@
           "card": "1",
           "value": "ref<government>"
         },
-        "legacy_government": [
-          {
-            "card": "1",
-            "value": "ref<government_reform>"
-          },
-          {
-            "card": "0..*",
-            "value": "enum<hardcoded_legacygovernments>"
-          }
-        ]
+        "legacy_government": {
+          "card": "1..*",
+          "deprecated": true,
+          "deprecation_diagnostic": false,
+          "value": "scalar"
+        }
       }
     },
     "government_mechanic_body": {
@@ -1010,12 +999,16 @@
         },
         "legacy_equivalent": {
           "card": "0..1",
+          "deprecated": true,
+          "deprecation_diagnostic": false,
           "override": true,
-          "value": "ref<government_reform> | enum<hardcoded_legacygovernments>"
+          "value": "ref<government_reform>"
         },
         "legacy_government": {
           "card": "0..1",
-          "value": "'yes'"
+          "deprecated": true,
+          "deprecation_diagnostic": false,
+          "value": "scalar"
         },
         "lock_level_when_selected": {
           "card": "0..1",
@@ -1828,18 +1821,6 @@
           "key": "def<government_reform_level>"
         }
       ]
-    },
-    "government_reform_type_body": {
-      "fields": {
-        "basic_reform": {
-          "card": "0..1",
-          "value": "'yes'"
-        },
-        "legacy_government": {
-          "card": "0..1",
-          "value": "'yes' | 'no'"
-        }
-      }
     },
     "government_type_body": {
       "fields": {

@@ -238,6 +238,7 @@ must be present (checked by the compiler).
 | `control` | no | `null` | `{"anyOf":[{"$ref":"#/$defs/ControlSpec"},{"type":"null"}]}` | Control-flow primitive (field attribute, never a global key name). |
 | `def` | no | `null` | `{"anyOf":[{"$ref":"#/$defs/DefSpec"},{"type":"null"}]}` | Defines a symbol instance at this position. |
 | `deprecated` | no | `null` | `{"type":["boolean","null"]}` | Whether the field is deprecated. |
+| `deprecation_diagnostic` | no | `null` | `{"type":["boolean","null"]}` | Whether using a deprecated field produces a diagnostic. Defaults to true. |
 | `doc` | no | `null` | `{"type":["string","null"]}` | Documentation text. |
 | `key` | no | `null` | `{"type":["string","null"]}` | Key type expression; only meaningful inside `patterns`. |
 | `list` | no | `null` | `{"type":["string","null"]}` | Bare-value list block whose element type is this expression. |

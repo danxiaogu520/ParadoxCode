@@ -222,6 +222,7 @@ fn field(value: &mut Value, expanded: bool) {
             ("doc", Value::Null),
             ("severity", json!("error")),
             ("deprecated", json!(false)),
+            ("deprecation_diagnostic", json!(true)),
             ("override", json!(false)),
         ],
     );
