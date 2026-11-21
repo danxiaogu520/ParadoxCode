@@ -31,7 +31,7 @@
         "localization": {
           "card": "1",
           "doc": "The right hand side must have localisation for $_short and $_full",
-          "value": "scalar"
+          "value": "def<holy_order_loc>"
         },
         "modifier": {
           "body": "modifier",

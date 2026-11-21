@@ -1,0 +1,56 @@
+{
+  "files": {
+    "music_assets": {
+      "ext": "asset",
+      "path": "music",
+      "root": "music_assets_file"
+    },
+    "music_songs": {
+      "ext": "txt",
+      "path": "music",
+      "root": "music_songs_file"
+    }
+  },
+  "schemas": {
+    "music_assets_file": {
+      "fields": {
+        "music": {
+          "body": "music_track_body",
+          "card": "0..*",
+          "def": {
+            "name": "field:name",
+            "type": "music_track"
+          }
+        }
+      },
+      "open": true
+    },
+    "music_song_body": {
+      "fields": {
+        "name": {
+          "card": "1",
+          "value": "ref<music_track>"
+        }
+      },
+      "open": true
+    },
+    "music_songs_file": {
+      "fields": {
+        "song": {
+          "body": "music_song_body",
+          "card": "0..*"
+        }
+      },
+      "open": true
+    },
+    "music_track_body": {
+      "fields": {
+        "name": {
+          "card": "1",
+          "value": "scalar"
+        }
+      },
+      "open": true
+    }
+  }
+}

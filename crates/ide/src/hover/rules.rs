@@ -323,10 +323,12 @@ fn ir_field_hover(
     };
     let mut values = Vec::new();
     let mut documents = Vec::new();
+    let mut display_keys = std::collections::BTreeSet::new();
     let mut scopes = Vec::new();
     for id in &fields {
         cancellation.checkpoint()?;
         let field = ir.field(*id);
+        display_keys.extend(ir.field_localisation_keys(*id, key, word));
         let value = match field.value {
             rules::ir::FieldValue::Scalar(matcher) => crate::ir_semantic::describe(ir, matcher),
             rules::ir::FieldValue::Block(schema) => {
@@ -511,6 +513,23 @@ fn ir_field_hover(
             lines
         },
     );
+    let mut rows = Vec::new();
+    for (label, key) in display_keys {
+        for (_, value) in
+            crate::localisation::localisation_previews_for_name(snapshot, &key, cancellation)?
+        {
+            if !value.is_empty() {
+                rows.push(crate::localisation::LocalisationPreviewRow {
+                    label: label.map(str::to_owned),
+                    value,
+                });
+            }
+        }
+    }
+    if !rows.is_empty() {
+        model.push_section(crate::localisation::localisation_preview_section(&rows));
+        model.has_localisation_preview = true;
+    }
     documents.sort();
     documents.dedup();
     for document in documents {

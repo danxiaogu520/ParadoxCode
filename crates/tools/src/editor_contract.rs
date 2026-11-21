@@ -129,6 +129,7 @@ pub fn data() -> serde_json::Value {
     "**/map/superregion.txt",
     "**/map/terrain.txt",
     "**/map/trade_winds.txt",
+    "**/music/*.asset",
     "**/music/*.txt",
     "**/missions/*.txt",
     "**/sound/*.txt",

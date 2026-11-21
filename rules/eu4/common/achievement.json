@@ -18,7 +18,7 @@
         },
         "localization": {
           "card": "1",
-          "value": "scalar"
+          "value": "def<achievement_loc>"
         },
         "possible": {
           "body": "trigger",

@@ -360,6 +360,9 @@ are declared with `def` at chosen positions in schemas:
 
 See the generated [FileRule reference](SOURCE-REFERENCE.md#filerule) for JSON fields and defaults.
 A script file category requires a root schema; omission would leave the file unvalidated.
+Disk discovery can allow an extra extension for one scan root through
+`scan_root_extensions` in `game.json`. For example, EU4 includes `.asset`
+under `music` alongside the usual script extensions.
 
 A category whose structure the rules do not model still declares a root: an
 open schema (`{ "open": true }`) says "any key, no rules" explicitly instead of
@@ -374,6 +377,12 @@ leaving the file unvalidated by omission.
   extension). Optional `"strip_prefix"` / `"strip_suffix"` strip affixes from
   the instance name (replacing `name_strip_prefix`/`name_strip_suffix` and
   `lexicon.member_name_suffixes`).
+- A repeated top-level block can use `ordinal:<root field>:<separator>` as its
+  name source. The name joins the lowercase discriminator value, the literal
+  separator and the zero-based ordinal among blocks with the same key in that
+  file. For example, the first technology in a file with `monarch_power = DIP`
+  is `dip_tech_cs_0` with `ordinal:monarch_power:_tech_cs_`. The discriminator
+  may appear after the blocks. A missing discriminator leaves the name unresolved.
 - **Subtype at `def`.** Writing a subtype in the def type (`event.country`)
   tags the instance with that subtype (§5).
 
@@ -408,7 +417,11 @@ Source format version 13 rejects the removed syntax.
 
 ## 6. Enums
 
-An enum is an array of literal member names. Related groups use separate enums
+An enum can also declare `{"members": [...], "localisation": {"name": "$", "desc": "$_desc"}}`.
+Its members retain their normal completion and validation behavior. The editor
+resolves the named templates for display and definition navigation.
+
+The compact enum form is an array of literal member names. Related groups use separate enums
 and explicit patterns; they may share a parameterised body:
 
 ```jsonc
@@ -448,6 +461,12 @@ default case — not `open` and with a `def<>` position — and needs no
 declaration.
 
 ### 7.2 Mixins
+
+A block schema or mixin may set `field_key_loc` for its own exact fields.
+For example, `"field_key_loc": "MODIFIER_${upper}"` maps `discipline` to
+`MODIFIER_DISCIPLINE`. Matched fields display available translations and
+support definition navigation. A local field override inherits the mixin
+template unless the schema supplies its own.
 
 A mixin is structural reuse. It belongs to the Schemas subsystem, is expanded
 at compile time, and does not exist at runtime:
@@ -510,7 +529,14 @@ changing Rust, because the runtime must understand its semantics:
 - In binding templates, `$` is the **instance-name placeholder**. This is a
   different syntax from the type-expression `$param`: binding templates are not
   type expressions.
+- A binding can set `strip_prefix` to remove a leading affix before expanding
+  its template. The match is ASCII case-insensitive and retains the remaining
+  spelling. `$` inserts the name and `${upper}` inserts its ASCII uppercase form.
 - `impl` is declared on the type and applies to every instance.
+- For a string field accepting both a translation key and raw text,
+  `ref<localisation> | scalar` indexes a reference when the key exists. Other
+  strings, including dynamic display expressions, remain valid. Ordinary
+  `loc` fields still require a translation in the selected language.
 - `Localised`/`HasIcon` replace `bindings/localisation.json` and
   `bindings/sprite.json`; `Template` replaces `dynamic_definition` and
   `token_definitions` (its `$param$` arguments are handled uniformly by

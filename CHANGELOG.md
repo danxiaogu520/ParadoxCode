@@ -9,6 +9,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- EU4 script hovers and Go to Definition resolve more localisation, including country names
+  and adjectives, technology levels, modifier labels, diplomatic attitudes, music and tutorials.
+  Scripted localisation is indexed by its declared function name. Its branches link to
+  translations when available and continue to accept literal text and runtime expressions.
+
 - Event hovers open a pinned event preview on demand. Mission hovers locate the referenced node
   in the mission tree. Regular script hovers return text without loading card artwork.
 

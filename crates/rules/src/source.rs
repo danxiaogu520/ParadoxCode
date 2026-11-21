@@ -167,6 +167,9 @@ pub enum SchemaSpec {
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BlockSchema {
+    /// Optional localisation template for its own exact keys. `$` preserves the spelling and `${upper}` uppercases it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field_key_loc: Option<String>,
     /// Mixin names, expanded at compile time.
     #[serde(default)]
     pub include: Vec<String>,
@@ -281,6 +284,9 @@ pub struct MapSpec {
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct MixinSpec {
+    /// Localisation template for the exact keys contributed by this mixin.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field_key_loc: Option<String>,
     /// Field specs contributed to every including schema.
     #[serde(default)]
     pub fields: BTreeMap<String, FieldOverloads>,
@@ -309,7 +315,7 @@ pub struct DefSpec {
     /// (`"event.country"`).
     #[serde(rename = "type")]
     pub type_name: String,
-    /// Instance-name source: `"key"` (default), `"field:<name>"`, or `"file"`.
+    /// Instance-name source: `key`, `field:<name>`, `file`, or `ordinal:<root field>:<separator>`.
     #[serde(default)]
     pub name: Option<String>,
     /// Prefix removed from the derived instance name.
@@ -475,6 +481,9 @@ pub struct TraitSpec {}
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BindingSpec {
+    /// Remove this leading affix from the instance name before expanding the template.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip_prefix: Option<String>,
     /// Localisation-key template (`$` stands for the instance name).
     #[serde(default)]
     pub loc: Option<String>,
@@ -486,12 +495,34 @@ pub struct BindingSpec {
     pub required: Option<bool>,
 }
 
-/// An enum is a list of literal member names.
+/// Literal enum members, optionally paired with named localisation templates for display.
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum EnumSpec {
     /// Literal members.
     Members(Vec<String>),
+    /// An enum with optional display bindings for its members.
+    Localised(LocalisedEnumSpec),
+}
+
+/// Localised enum members keep normal enum validation and completion.
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LocalisedEnumSpec {
+    /// The accepted member spellings.
+    pub members: Vec<String>,
+    /// Display labels mapped to localisation-key templates.
+    pub localisation: BTreeMap<String, String>,
+}
+
+impl EnumSpec {
+    /// Members in author order, shared by both source forms.
+    pub fn members(&self) -> &[String] {
+        match self {
+            Self::Members(members) => members,
+            Self::Localised(spec) => &spec.members,
+        }
+    }
 }
 
 /// The scope model.
