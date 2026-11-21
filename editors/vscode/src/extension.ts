@@ -228,7 +228,7 @@ function handleServerReady(
         log.appendLine('pdc ready');
     }
     if (!wasReady && readyClient.state === State.Running) {
-        void loadedFiles?.refresh(readyClient);
+        loadedFiles?.setClient(readyClient);
     }
 }
 
@@ -1388,8 +1388,11 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
                 return;
             }
             updateStatus(event.newState);
-            if (event.newState === State.Running && serverReady) {
-                void loadedFiles?.refresh(currentClient);
+            if (event.newState !== State.Running) {
+                setServerReady(false);
+                loadedFiles?.setClient(undefined);
+            } else if (serverReady) {
+                loadedFiles?.setClient(currentClient);
             }
         });
         currentClient.onNotification(LogMessageNotification.type, (params) => {
@@ -1440,6 +1443,7 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
 async function stopClient(loadedFiles?: LoadedFilesProvider): Promise<void> {
     clientStartSequence += 1;
     setServerReady(false);
+    loadedFiles?.setClient(undefined);
     if (client) {
         const previous = client;
         client = undefined;
@@ -1453,7 +1457,6 @@ async function stopClient(loadedFiles?: LoadedFilesProvider): Promise<void> {
             log.appendLine(`WARNING stopping pdc: ${message}`);
         }
     }
-    loadedFiles?.clear();
 }
 
 /**
@@ -1649,10 +1652,7 @@ export function activate(context: vscode.ExtensionContext): void {
     applyDebugConfiguration();
 
     loadedFilesProvider = new LoadedFilesProvider();
-    context.subscriptions.push(
-        loadedFilesProvider,
-        vscode.window.registerTreeDataProvider('paradoxcode.loadedFiles', loadedFilesProvider),
-    );
+    context.subscriptions.push(loadedFilesProvider);
 
     // Transparent localisation (pdcloc:// decoded views) is independent of the
     // language server lifecycle: register it up front so a pdcloc editor can
@@ -1706,7 +1706,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('paradoxcode.updateIndexCaches', () => updateIndexCaches(restart)),
         vscode.commands.registerCommand('paradoxcode.exportDiagnostics', () => exportDiagnostics()),
         vscode.commands.registerCommand('paradoxcode.formatWorkspace', () => formatWorkspace()),
-        vscode.commands.registerCommand('paradoxcode.refreshLoadedFiles', () => loadedFilesProvider.refresh(client)),
+        vscode.commands.registerCommand('paradoxcode.refreshLoadedFiles', () => loadedFilesProvider.refresh()),
         vscode.commands.registerCommand('paradoxcode.refreshMissionPreview', () => MissionPreviewPanel.refresh(client)),
         vscode.commands.registerCommand('paradoxcode.openMissionIconPicker', () => {
             void MissionIconPickerPanel.show(context.extensionUri);

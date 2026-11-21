@@ -7,6 +7,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The VS Code Loaded Files view starts collapsed in new workspaces and fetches the file list
+  on demand when expanded.
+
 ## [0.5.6] - 2026-11-17
 
 ### Removed
