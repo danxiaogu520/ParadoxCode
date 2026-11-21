@@ -2,16 +2,15 @@
 
 use super::render::{HoverModel, code_span};
 use super::template::template_signature_hover;
-use crate::localisation::{
-    localisation_preview_section, localisation_previews_for_name, symbol_localisation_preview,
-    unlabelled_preview_rows,
+use crate::localisation::{localisation_preview_section, symbol_localisation_preview};
+use crate::resolution::{
+    DefinitionInfo, ResolutionDefinition, definition_priority, definition_selection_location,
+    symbol_candidates_for_hover,
 };
-use crate::resolution::symbol_candidates_for_hover;
 use crate::semantic::dynamic_definition_summary;
 use crate::support::{root_for_path, same_location};
 use crate::types::{CancellationToken, Cancelled, Location};
 use engine::{AnalysisSnapshot, SourceRootKind};
-use text::TextRange;
 
 /// Maximum number of candidate paths rendered before the list is truncated.
 const MAX_HOVER_CANDIDATES: usize = 8;
@@ -25,128 +24,114 @@ pub(crate) fn hover_for_symbol(
     snapshot: &AnalysisSnapshot,
     kind: &str,
     name: &str,
-    _range: TextRange,
+    declaration: Option<&DefinitionInfo>,
     cancellation: &CancellationToken,
 ) -> Result<HoverModel, Cancelled> {
     let candidates = symbol_candidates_for_hover(snapshot, kind, name, cancellation)?;
     let mut model = HoverModel::new(format!("### {} {}", kind, code_span(name)));
+    let declaration = declaration.map(|definition| ResolutionDefinition {
+        location: definition.symbol.location.clone(),
+        selection_range: definition.symbol.selection_range,
+        priority: definition_priority(snapshot, definition),
+    });
+    let resolved = candidates.first().filter(|best| {
+        candidates
+            .get(1)
+            .is_none_or(|other| other.priority < best.priority)
+    });
     if candidates.is_empty() {
         model.push_section(format!("#### unresolved {kind} symbol"));
-    } else {
-        let highest = candidates
+    } else if let Some(definition) = resolved {
+        model.push_section(format!(
+            "#### Resolved definition\n\n- Source root: {}\n- Defined in: `{}`",
+            symbol_source_root(snapshot, &definition.location),
+            symbol_location_path(&definition.location),
+        ));
+        let shadowed = candidates
             .iter()
-            .map(|candidate| candidate.priority)
-            .max()
-            .unwrap_or(0);
-        let active = candidates
-            .iter()
-            .filter(|candidate| candidate.priority == highest)
+            .filter(|candidate| {
+                !same_location(&candidate.location, &definition.location)
+                    && candidate.priority < definition.priority
+            })
             .collect::<Vec<_>>();
-        if active.len() == 1 {
-            let definition = active[0];
-            if matches!(kind, "event" | "mission") {
-                model.preview = Some(crate::PreviewTarget {
-                    title: None,
-                    kind: kind.to_owned(),
-                    id: name.to_owned(),
-                    location: crate::resolution::definition_selection_location(definition),
-                });
-            }
+        if !shadowed.is_empty() {
             model.push_section(format!(
-                "#### Resolved definition\n\n- Source root: {}\n- Defined in: `{}`",
-                symbol_source_root(snapshot, &definition.location),
-                symbol_location_path(&definition.location),
-            ));
-            let shadowed = candidates
-                .iter()
-                .filter(|candidate| {
-                    !same_location(&candidate.location, &definition.location)
-                        && candidate.priority < definition.priority
-                })
-                .collect::<Vec<_>>();
-            if !shadowed.is_empty() {
-                model.push_section(format!(
-                    "#### Shadowed definitions:\n\n{}",
-                    shadowed
-                        .into_iter()
-                        .map(|candidate| format!(
-                            "- {}: `{}`",
-                            symbol_source_root(snapshot, &candidate.location),
-                            symbol_location_path(&candidate.location),
-                        ))
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                ));
-            }
-            let previews =
-                symbol_localisation_preview(snapshot, kind, name, definition, cancellation)?;
-            if !previews.is_empty() {
-                if let Some(target) = model.preview.as_mut() {
-                    let field = if kind == "mission" { "name" } else { "title" };
-                    target.title = previews
-                        .iter()
-                        .find(|row| row.label.as_deref() == Some(field))
-                        .map(|row| row.value.clone());
-                }
-                model.has_localisation_preview = true;
-                model.push_section(localisation_preview_section(&previews));
-            }
-            if let Some(summary) = dynamic_definition_summary(snapshot, kind, name) {
-                let mut signature = template_signature_hover(snapshot, &summary);
-                if snapshot.ir().schemas.is_empty()
-                    && crate::semantic::dynamic_definition_type(snapshot, kind)
-                {
-                    signature.push('\n');
-                    signature.push_str(&crate::template_contracts::contract_hover_line(
-                        snapshot, kind, name,
-                    ));
-                }
-                model.push_section(signature);
-            }
-        } else {
-            // Ambiguous symbols still deserve a preview when any candidate carries localisation
-            // text; that is exactly the case where the user most wants to see the translations.
-            if kind.eq_ignore_ascii_case("localisation") {
-                let previews = localisation_previews_for_name(snapshot, name, cancellation)?;
-                let rows = unlabelled_preview_rows(&previews);
-                if !rows.is_empty() {
-                    model.has_localisation_preview = true;
-                    model.push_section(localisation_preview_section(&rows));
-                }
-            } else {
-                for candidate in &candidates {
-                    let previews =
-                        symbol_localisation_preview(snapshot, kind, name, candidate, cancellation)?;
-                    if !previews.is_empty() {
-                        model.has_localisation_preview = true;
-                        model.push_section(localisation_preview_section(&previews));
-                        break;
-                    }
-                }
-            }
-            let shown = candidates.len().min(MAX_HOVER_CANDIDATES);
-            let mut lines = candidates
-                .iter()
-                .take(shown)
-                .map(|candidate| {
-                    let mut line = format!(
+                "#### Shadowed definitions:\n\n{}",
+                shadowed
+                    .into_iter()
+                    .map(|candidate| format!(
                         "- {}: `{}`",
                         symbol_source_root(snapshot, &candidate.location),
                         symbol_location_path(&candidate.location),
-                    );
-                    if let Some(position) = symbol_location_position(snapshot, &candidate.location)
-                    {
-                        line.push_str(&format!(" {position}"));
-                    }
-                    line
-                })
-                .collect::<Vec<_>>();
-            if candidates.len() > shown {
-                lines.push(format!("- … and {} more", candidates.len() - shown));
-            }
-            model.push_section(format!("#### ambiguous {kind} symbol"));
-            model.push_section(format!("#### Candidates:\n\n{}", lines.join("\n")));
+                    ))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            ));
         }
+    } else {
+        let shown = candidates.len().min(MAX_HOVER_CANDIDATES);
+        let mut lines = candidates
+            .iter()
+            .take(shown)
+            .map(|candidate| {
+                let mut line = format!(
+                    "- {}: `{}`",
+                    symbol_source_root(snapshot, &candidate.location),
+                    symbol_location_path(&candidate.location),
+                );
+                if let Some(position) = symbol_location_position(snapshot, &candidate.location) {
+                    line.push_str(&format!(" {position}"));
+                }
+                line
+            })
+            .collect::<Vec<_>>();
+        if candidates.len() > shown {
+            lines.push(format!("- … and {} more", candidates.len() - shown));
+        }
+        model.push_section(format!("#### ambiguous {kind} symbol"));
+        model.push_section(format!("#### Candidates:\n\n{}", lines.join("\n")));
+    }
+
+    // Localisation keys share the effective translation for the configured language.
+    // Other symbols use the declaration under the cursor or a uniquely resolved target.
+    let preview_definition = if kind.eq_ignore_ascii_case("localisation") {
+        candidates.first()
+    } else {
+        declaration.as_ref().or(resolved)
+    };
+    if let Some(definition) = preview_definition {
+        let previews = symbol_localisation_preview(snapshot, kind, name, definition, cancellation)?;
+        if matches!(kind, "event" | "mission") {
+            let field = if kind == "mission" { "name" } else { "title" };
+            let title = previews
+                .iter()
+                .find(|row| row.label.as_deref() == Some(field))
+                .map(|row| row.value.clone());
+            model.preview = Some(crate::PreviewTarget {
+                title,
+                kind: kind.to_owned(),
+                id: name.to_owned(),
+                location: definition_selection_location(definition),
+            });
+        }
+        if !previews.is_empty() {
+            model.has_localisation_preview = true;
+            model.push_section(localisation_preview_section(&previews));
+        }
+    }
+    if resolved.is_some()
+        && let Some(summary) = dynamic_definition_summary(snapshot, kind, name)
+    {
+        let mut signature = template_signature_hover(snapshot, &summary);
+        if snapshot.ir().schemas.is_empty()
+            && crate::semantic::dynamic_definition_type(snapshot, kind)
+        {
+            signature.push('\n');
+            signature.push_str(&crate::template_contracts::contract_hover_line(
+                snapshot, kind, name,
+            ));
+        }
+        model.push_section(signature);
     }
     Ok(model)
 }

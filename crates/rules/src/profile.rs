@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Facts for the supported mission view; capability presence is explicit, independent of game id.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -445,6 +445,10 @@ pub struct GameProfile {
     /// spellings such as `scripted_localisation`, `scripted_localization`, and `scripted_loc`
     /// without teaching the generic engine a concrete game layout.
     pub scripted_localisation_directories: Vec<String>,
+    /// Known runtime parameters that take precedence over same-named keys in `$NAME$` hovers.
+    /// Spellings are matched as written so differently cased custom keys can still resolve.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub localisation_runtime_parameters: BTreeSet<String>,
     /// Ordered top-level definition rules; the first match wins.
     pub definitions: Vec<ProfileDefinitionRule>,
     /// Ordered scalar-reference rules; the first match wins.
@@ -716,6 +720,7 @@ impl GameProfile {
             scan_archive_roots: Vec::new(),
             scan_archive_extensions: Vec::new(),
             scripted_localisation_directories: Vec::new(),
+            localisation_runtime_parameters: BTreeSet::new(),
             definitions: Vec::new(),
             references: Vec::new(),
             value_definitions: Vec::new(),

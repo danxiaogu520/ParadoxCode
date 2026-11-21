@@ -533,6 +533,12 @@ changing Rust, because the runtime must understand its semantics:
   its template. The match is ASCII case-insensitive and retains the remaining
   spelling. `$` inserts the name and `${upper}` inserts its ASCII uppercase form.
 - `impl` is declared on the type and applies to every instance.
+- A type may also declare `hover_localisation`, a map from exact dotted field paths
+  relative to its definition body to hover row labels. For example, an event can map
+  `title` to `title`, `desc.desc` to `conditional desc`, and `option.name` to `option`.
+  Append `[]` to select direct bare list members. Only rule-typed localisation
+  references at those paths contribute explicit rows. Template bindings still expand
+  for every instance. The map affects the definition's hover table.
 - For a string field accepting both a translation key and raw text,
   `ref<localisation> | scalar` indexes a reference when the key exists. Other
   strings, including dynamic display expressions, remain valid. Ordinary

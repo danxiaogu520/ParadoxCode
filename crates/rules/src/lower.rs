@@ -28,10 +28,10 @@ use crate::compile::{
 use crate::expr::{self, Argument, Expr, LiteralPart, Param, Primary, ScalarKind, Segment};
 use crate::ir::{
     Binding, Card, Control, DefName, DefSpec, DocumentParser, EnumId, EnumInfo, EnumRow, Field,
-    FieldId, FieldValue, FileResolution, FileRule, GameConfig, Interner, LinkInfo, Matcher,
-    MatcherId, PatternPart, Provenance, RefTarget, RegisterInfo, RootRule, RulesIr, Schema,
-    SchemaId, ScopeEffect, ScopeModel, ScopeRef, SubtypeInfo, Symbol, TraitArgument, TraitId,
-    TraitImpl, TraitInfo, TypeId, TypeInfo, TypeResolution,
+    FieldId, FieldValue, FileResolution, FileRule, GameConfig, HoverLocalisationField, Interner,
+    LinkInfo, Matcher, MatcherId, PatternPart, Provenance, RefTarget, RegisterInfo, RootRule,
+    RulesIr, Schema, SchemaId, ScopeEffect, ScopeModel, ScopeRef, SubtypeInfo, Symbol,
+    TraitArgument, TraitId, TraitImpl, TraitInfo, TypeId, TypeInfo, TypeResolution,
 };
 use crate::matcher::FileMatcher;
 use crate::source::{
@@ -638,6 +638,7 @@ impl<'a> Lowering<'a> {
                     open: spec.open.unwrap_or(false),
                     builtin: builtin.into_boxed_slice(),
                     trait_impls: Vec::new(),
+                    hover_localisation: Vec::new(),
                 });
             }
         }
@@ -656,9 +657,27 @@ impl<'a> Lowering<'a> {
                 });
             }
             let trait_impls = self.lower_trait_impls(&spec.trait_impls);
+            let hover_localisation = spec
+                .hover_localisation
+                .iter()
+                .map(|(path, label)| {
+                    let (path, list) = path
+                        .strip_suffix("[]")
+                        .map_or((path.as_str(), false), |path| (path, true));
+                    HoverLocalisationField {
+                        path: path
+                            .split('.')
+                            .map(|part| self.strings.intern_folded(part))
+                            .collect(),
+                        label: self.strings.intern_verbatim(label),
+                        list,
+                    }
+                })
+                .collect();
             let info = &mut self.types[type_id.index()];
             info.subtypes = subtypes;
             info.trait_impls = trait_impls;
+            info.hover_localisation = hover_localisation;
         }
     }
 

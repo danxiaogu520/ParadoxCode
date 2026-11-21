@@ -15,10 +15,10 @@ use text::{TextRange, TextSize};
 
 use crate::resolution::{
     ResolutionDefinition, effective_localisation_candidate, localisation_language,
-    semantic_data_with_cancellation, symbol_candidates_for_hover, text_range_within,
+    symbol_candidates_for_hover, text_range_within,
 };
 use crate::support::{
-    ParsedContent, ParsedInput, input_for_document, input_for_source_file,
+    ParsedContent, ParsedInput, contains, input_for_document, input_for_source_file,
     truncate_localisation_preview,
 };
 use crate::types::{CancellationToken, Cancelled};
@@ -289,40 +289,79 @@ pub fn localisation_search_page_with_cancellation(
     Ok(LocalisationSearchResult { hits, truncated })
 }
 
-/// The `$NAME$` fragment at a position inside a localisation value. The inner
-/// text is either a nested localisation key reference or a placeholder the
-/// displaying context binds (`$WHO$`, `$VAL$` — vanilla binds these in the
-/// engine, not in script). Returns the full fragment including both `$`
-/// delimiters and the inner name; `$$` escapes and fragment bodies with
-/// whitespace or command syntax are rejected.
-pub(crate) fn localisation_key_reference_fragment(
+/// A `$NAME$` or `$NAME|format$` substitution inside a localisation value.
+pub(crate) struct LocalisationFragment<'a> {
+    pub(crate) range: TextRange,
+    pub(crate) name: &'a str,
+    pub(crate) format: Option<&'a str>,
+}
+
+/// Finds the substitution at the cursor, including both delimiters in its range.
+/// Empty dollar pairs and bodies with whitespace or command syntax are rejected.
+pub(crate) fn localisation_fragment_at(
     input: &ParsedInput,
     position: TextSize,
-) -> Option<(TextRange, String)> {
+) -> Option<LocalisationFragment<'_>> {
     if input.format != FileFormat::Localisation {
         return None;
     }
-    let offset = usize::try_from(position).ok()?.min(input.source.len());
-    if !input.source.is_char_boundary(offset) {
-        return None;
+    let ParsedContent::Text(parsed) = &input.parsed;
+    let entry = parsed
+        .root()
+        .children()
+        .find(|node| contains(node.range(), position))?;
+    let value = entry.children().find(|node| {
+        matches!(
+            node.kind(),
+            CstKind::LocalisationString | CstKind::UnquotedValue
+        ) && contains(node.range(), position)
+    })?;
+    let source = parsed.text(value.range())?;
+    let offset = usize::try_from(position - value.range().start()).ok()?;
+    let mut start = 0;
+    // Pair delimiters from the start of the value, including empty pairs and
+    // adjacent substitutions like `$FIRST$$SECOND$`.
+    while let Some(open) = source[start..].find('$').map(|open| start + open) {
+        if offset < open {
+            return None;
+        }
+        let close = open + 1 + source[open + 1..].find('$')?;
+        if offset <= close {
+            let body = &source[open + 1..close];
+            let (name, format) = body
+                .split_once('|')
+                .map_or((body, None), |(name, format)| (name, Some(format)));
+            if name.is_empty()
+                || body.len() > 128
+                || !name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.'))
+                || format.is_some_and(|format| {
+                    !format.split('|').all(|part| {
+                        !part.is_empty()
+                            && part.chars().all(|character| {
+                                character.is_ascii_alphanumeric()
+                                    || matches!(character, '+' | '-' | '%' | '=' | '&' | '¤')
+                            })
+                    })
+                })
+            {
+                return None;
+            }
+            let base = value.range().start();
+            let range = TextRange::new(
+                base + u32::try_from(open).ok()?,
+                base + u32::try_from(close + 1).ok()?,
+            )?;
+            return Some(LocalisationFragment {
+                range,
+                name,
+                format,
+            });
+        }
+        start = close + 1;
     }
-    let open = input.source[..offset].rfind('$')?;
-    if input.source[open + 1..offset].contains('$') {
-        return None;
-    }
-    let close = offset + input.source[offset..].find('$')?;
-    let name = input.source.get(open + 1..close)?;
-    if name.is_empty() || name.len() > 128 {
-        return None;
-    }
-    if !name
-        .chars()
-        .all(|character| character.is_ascii_alphanumeric() || character == '_' || character == '.')
-    {
-        return None;
-    }
-    let range = TextRange::new(u32::try_from(open).ok()?, u32::try_from(close + 1).ok()?)?;
-    Some((range, name.to_owned()))
+    None
 }
 
 /// Renders the preview value of a localisation definition, preferring the snapshot cache and
@@ -469,20 +508,7 @@ pub(crate) struct LocalisationPreviewRow {
 /// definition bodies carrying many explicit localisation references.
 const MAX_PREVIEW_FIELDS: usize = 6;
 
-/// Finds the localisation previews for a non-localisation symbol definition.
-///
-/// Type-instance localisation mappings are indexed as ordinary localisation references at the
-/// instance's source range.  Looking those references up from the resolved definition lets a
-/// hover over `event = foo.1` (or another typed symbol use) show the same preview as hovering its
-/// generated localisation key. Only declared bindings generate keys — a type carries the
-/// same-name convention exactly when its JSON declares a self binding — and the coverage
-/// matrix tries each binding (`$_title`, `building_$`, `harmonized_$`, …) for every
-/// definition, showing only the keys that actually resolve.
-///
-/// Every strategy contributes its resolvable rows instead of the first match winning: a
-/// definition may carry an explicit `title` while its `desc` template also resolves, and the
-/// hover shows both, one labelled field per row group. Rows repeating a `(language, value)`
-/// pair already shown are dropped.
+/// Previews a localisation key or a definition's display fields and declared bindings.
 pub(crate) fn symbol_localisation_preview(
     snapshot: &AnalysisSnapshot,
     kind: &str,
@@ -494,126 +520,163 @@ pub(crate) fn symbol_localisation_preview(
         let previews = localisation_previews_for_name(snapshot, symbol_name, cancellation)?;
         return Ok(unlabelled_preview_rows(&previews));
     }
-    if !kind_is_localisation_displayable(snapshot, kind) {
+    let ir = snapshot.ir();
+    let Some(type_id) = ir.type_by_name(kind) else {
         return Ok(Vec::new());
-    }
-
-    let full_range = definition.location.range;
-    let selection_range = definition.selection_range;
-    let mut references = Vec::<(String, TextRange)>::new();
-    let mut label_input = None;
-    if let Some(document) = definition.location.document.as_ref() {
-        if let Some(input) = input_for_document(snapshot, document) {
-            references.extend(localisation_references_for_hover(
-                snapshot,
-                &input,
-                cancellation,
-            )?);
-            label_input = Some(input);
-        }
-    } else if let Some(file) = definition.location.file {
-        if let Some(input) = input_for_source_file(snapshot, file) {
-            references.extend(localisation_references_for_hover(
-                snapshot,
-                &input,
-                cancellation,
-            )?);
-            label_input = Some(input);
-        } else {
-            references.extend(
-                snapshot
-                    .index()
-                    .references(file)
-                    .iter()
-                    .filter(|reference| reference.kind.eq_ignore_ascii_case("localisation"))
-                    .map(|reference| (reference.name.to_string(), reference.range)),
-            );
-        }
-    }
-    references.retain(|(_, range)| text_range_within(*range, full_range));
-    references.sort_by_key(|(_, range)| {
-        (
-            if *range == selection_range { 0 } else { 1 },
-            range.start(),
-            range.end(),
-        )
-    });
-    references.dedup();
-
+    };
+    let info = ir.type_info(type_id);
     let mut rows = Vec::new();
     let mut seen = BTreeSet::new();
-    for (name, range) in references {
-        cancellation.checkpoint()?;
-        let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
-        if previews.is_empty() {
-            continue;
-        }
-        let label = generated_key_field(snapshot, kind, symbol_name, &name)
-            .map(str::to_owned)
-            .or_else(|| {
-                label_input
-                    .as_ref()
-                    .and_then(|input| enclosing_field_label(input, range))
-            });
-        push_preview_rows(&mut rows, &mut seen, label, &previews);
-    }
-    collect_generated_preview_rows(
-        snapshot,
-        kind,
-        symbol_name,
-        &mut rows,
-        &mut seen,
-        cancellation,
-    )?;
-    Ok(rows)
-}
-
-/// Whether hover localisation previews apply to a kind: it names a semantic
-/// type. Types without declared bindings can still carry schema-typed
-/// localisation fields whose in-range references drive the preview.
-pub(crate) fn kind_is_localisation_displayable(snapshot: &AnalysisSnapshot, kind: &str) -> bool {
-    snapshot.ir().type_by_name(kind).is_some()
-}
-
-/// Every binding declared by the resolved instance's type.
-fn type_trait_impls(
-    snapshot: &AnalysisSnapshot,
-    type_id: rules::ir::TypeId,
-) -> &[rules::ir::TraitImpl] {
-    &snapshot.ir().type_info(type_id).trait_impls
-}
-
-/// Appends every generated-key row (self bindings and template bindings alike)
-/// whose key resolves, labelling each group with the binding name.
-fn collect_generated_preview_rows(
-    snapshot: &AnalysisSnapshot,
-    kind: &str,
-    symbol_name: &str,
-    rows: &mut Vec<LocalisationPreviewRow>,
-    seen: &mut BTreeSet<(Option<String>, String)>,
-    cancellation: &CancellationToken,
-) -> Result<(), Cancelled> {
-    let ir = snapshot.ir();
-    if let Some(type_id) = ir.type_by_name(kind) {
-        for implementation in type_trait_impls(snapshot, type_id) {
-            for (label, argument) in &implementation.arguments {
-                if let rules::ir::TraitArgument::Binding(binding) = argument
-                    && let Some(template) = binding.loc
-                {
-                    cancellation.checkpoint()?;
-                    let name = binding.expand(ir.strings(), template, symbol_name);
-                    let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
-                    push_preview_rows(
-                        rows,
-                        seen,
-                        Some(ir.strings.resolve(*label).to_owned()),
-                        &previews,
-                    );
-                }
+    if !info.hover_localisation.is_empty() {
+        // Bare index references carry no field path. A definition with no available
+        // frontend can still show its declared template bindings.
+        let input = match definition.location.document.as_ref() {
+            Some(document) => input_for_document(snapshot, document),
+            None => definition
+                .location
+                .file
+                .and_then(|file| input_for_source_file(snapshot, file)),
+        };
+        if let Some(input) = &input {
+            for (label, key) in explicit_localisation_keys(
+                ir,
+                type_id,
+                input,
+                definition.location.range,
+                cancellation,
+            )? {
+                let previews = localisation_previews_for_name(snapshot, key, cancellation)?;
+                push_preview_rows(&mut rows, &mut seen, Some(label.to_owned()), &previews);
             }
         }
     }
-    Ok(())
+    for implementation in &info.trait_impls {
+        for (label, argument) in &implementation.arguments {
+            if let rules::ir::TraitArgument::Binding(binding) = argument
+                && let Some(template) = binding.loc
+            {
+                cancellation.checkpoint()?;
+                let name = binding.expand(ir.strings(), template, symbol_name);
+                let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
+                push_preview_rows(
+                    &mut rows,
+                    &mut seen,
+                    Some(ir.strings.resolve(*label).to_owned()),
+                    &previews,
+                );
+            }
+        }
+    }
+    Ok(rows)
+}
+
+/// Returns the rule-typed keys at the exact allowlisted paths of this definition.
+fn explicit_localisation_keys<'a>(
+    ir: &'a rules::ir::RulesIr,
+    type_id: rules::ir::TypeId,
+    input: &'a ParsedInput,
+    definition_range: TextRange,
+    cancellation: &CancellationToken,
+) -> Result<Vec<(&'a str, &'a str)>, Cancelled> {
+    let Some(hir) = input.hir.as_deref() else {
+        return Ok(Vec::new());
+    };
+    let properties = hir.properties_in_range(definition_range);
+    let is_file_definition = definition_range == hir.syntax().root().range()
+        && input
+            .path
+            .as_ref()
+            .and_then(|path| ir.file_rule(path))
+            .is_some_and(|(_, file)| {
+                matches!(&file.root, rules::ir::RootRule::Instance { def: Some(def), .. }
+                if def.type_id == type_id)
+            });
+    let owner_path = if is_file_definition {
+        &[]
+    } else if let Some(owner) = properties
+        .clone()
+        .find(|property| property.range == definition_range)
+    {
+        owner.path.as_slice()
+    } else {
+        return Ok(Vec::new());
+    };
+    let nested_definitions = hir
+        .definitions()
+        .iter()
+        .filter(|definition| {
+            definition.range != definition_range
+                && text_range_within(definition.range, definition_range)
+        })
+        .collect::<Vec<_>>();
+    let allowed_fields = &ir.type_info(type_id).hover_localisation;
+    let mut references = hir
+        .references()
+        .iter()
+        .filter(|reference| {
+            reference.kind.as_ref() == "localisation"
+                && matches!(
+                    reference.origin,
+                    hir::HirReferenceOrigin::SemanticTyped
+                        | hir::HirReferenceOrigin::OptionalLocalisation
+                )
+                && text_range_within(reference.range, definition_range)
+        })
+        .collect::<Vec<_>>();
+    references.sort_by_key(|reference| reference.range.start());
+    let mut keys = Vec::new();
+    for property in properties {
+        cancellation.checkpoint()?;
+        let Some(path) = property.path.strip_prefix(owner_path) else {
+            continue;
+        };
+        let Some(field) = allowed_fields.iter().find(|field| {
+            field.list == property.scalar.is_none()
+                && path.len() == field.path.len()
+                && path.iter().zip(&field.path).all(|(actual, expected)| {
+                    actual.eq_ignore_ascii_case(ir.strings.resolve(*expected))
+                })
+        }) else {
+            continue;
+        };
+        if nested_definitions
+            .iter()
+            .any(|definition| text_range_within(property.range, definition.range))
+        {
+            continue;
+        }
+        let Some(value_range) = property
+            .scalar
+            .as_ref()
+            .map(|scalar| scalar.range)
+            .or(property.value_range)
+        else {
+            continue;
+        };
+        let first =
+            references.partition_point(|reference| reference.range.start() < value_range.start());
+        for reference in references[first..]
+            .iter()
+            .take_while(|reference| reference.range.start() < value_range.end())
+        {
+            let matches_value = if field.list {
+                text_range_within(reference.range, value_range)
+                    && hir
+                        .bare_values()
+                        .iter()
+                        .any(|item| item.range == reference.range)
+                    && !hir
+                        .properties_in_range(value_range)
+                        .any(|nested| text_range_within(reference.range, nested.range))
+            } else {
+                reference.range == value_range
+            };
+            if matches_value {
+                keys.push((ir.strings.resolve(field.label), reference.name.as_str()));
+            }
+        }
+    }
+    Ok(keys)
 }
 
 /// Appends one row per binding label and value; repeated rows and empty
@@ -646,52 +709,6 @@ pub(crate) fn unlabelled_preview_rows(
             value: value.clone(),
         })
         .collect()
-}
-
-/// The binding name whose generated key expands to `key` for this
-/// instance, when one exists — labels generated-key references hovering a
-/// definition (`mission_one_title` → `name`).
-fn generated_key_field<'a>(
-    snapshot: &'a AnalysisSnapshot,
-    kind: &str,
-    symbol_name: &str,
-    key: &str,
-) -> Option<&'a str> {
-    let ir = snapshot.ir();
-    ir.type_by_name(kind).and_then(|id| {
-        type_trait_impls(snapshot, id)
-            .iter()
-            .find_map(|implementation| {
-                implementation
-                    .arguments
-                    .iter()
-                    .find_map(|(label, argument)| {
-                        let rules::ir::TraitArgument::Binding(binding) = argument else {
-                            return None;
-                        };
-                        let template = binding.loc?;
-                        binding
-                            .expand(ir.strings(), template, symbol_name)
-                            .eq_ignore_ascii_case(key)
-                            .then(|| ir.strings.resolve(*label))
-                    })
-            })
-    })
-}
-
-/// The key of the property whose scalar value sits at `range` — labels
-/// explicit localisation references with their source field (`title = …`).
-fn enclosing_field_label(input: &ParsedInput, range: TextRange) -> Option<String> {
-    let hir = input.hir.as_deref()?;
-    hir.properties()
-        .iter()
-        .find(|property| {
-            property
-                .scalar
-                .as_ref()
-                .is_some_and(|scalar| text_range_within(range, scalar.range))
-        })
-        .map(|property| property.key.to_string())
 }
 
 /// Formats the localisation-preview section over labelled row groups as a
@@ -753,34 +770,6 @@ pub(crate) fn localisation_preview_section(rows: &[LocalisationPreviewRow]) -> S
 /// and a newline would split the row.
 fn escape_table_cell(text: &str) -> String {
     text.replace(['\n', '\r'], " ").replace('|', "\\|")
-}
-
-fn localisation_references_for_hover(
-    snapshot: &AnalysisSnapshot,
-    input: &ParsedInput,
-    cancellation: &CancellationToken,
-) -> Result<Vec<(String, TextRange)>, Cancelled> {
-    let derived = input
-        .hir
-        .as_deref()
-        .zip(input.path.as_ref())
-        .map(|(hir, path)| {
-            hir::derived_localisation_references_for_hover(hir, path, snapshot.rules())
-        })
-        .unwrap_or_default();
-    let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
-    let mut references = semantic
-        .references
-        .into_iter()
-        .filter(|reference| reference.kind.eq_ignore_ascii_case("localisation"))
-        .map(|reference| (reference.name, reference.range))
-        .collect::<Vec<_>>();
-    references.extend(
-        derived
-            .into_iter()
-            .map(|reference| (reference.name, reference.range)),
-    );
-    Ok(references)
 }
 
 pub(crate) fn find_cst_node(

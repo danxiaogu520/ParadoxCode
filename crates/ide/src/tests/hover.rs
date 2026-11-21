@@ -1215,7 +1215,7 @@ fn localisation_variable_fragment_hover_resolves_keys_and_names_placeholders() {
         "l_english:\n",
         " my_key:0 \"Resolve $nested_key$ here\"\n",
         " nested_key:0 \"Nested text\"\n",
-        " other:0 \"$WHO$ will decide\"\n",
+        " other:0 \"$CUSTOM_ARGUMENT$ will decide\"\n",
     );
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open localisation");
@@ -1232,16 +1232,157 @@ fn localisation_variable_fragment_hover_resolves_keys_and_names_placeholders() {
         nested_hover.contents
     );
 
-    let placeholder = u32::try_from(text.find("$WHO$").expect("fragment") + 2).expect("position");
+    let placeholder =
+        u32::try_from(text.find("$CUSTOM_ARGUMENT$").expect("fragment") + 2).expect("position");
     let placeholder_hover = hover(&snapshot, &id, placeholder).expect("placeholder hover");
     assert!(
-        placeholder_hover.contents.contains("### `WHO`")
+        placeholder_hover.contents.contains("### `CUSTOM_ARGUMENT`")
             && placeholder_hover
                 .contents
                 .contains("Localisation variable placeholder"),
         "unresolvable fragment names itself a placeholder: {}",
         placeholder_hover.contents
     );
+}
+
+#[test]
+fn localisation_hover_keeps_runtime_parameters_separate_from_same_named_keys() {
+    let mut host = eu4_host(game::eu4::bootstrap_rules());
+    let id = DocumentId::new("file:///tmp/localisation/runtime-parameters.yml");
+    let source = concat!(
+        "l_english:\n",
+        " sample:0 \"$NUM$$VAL$ $Consort$ $STATIC_LABEL$\"\n",
+        " NUM:0 \"Country label\"\n",
+        " VAL:0 \"Other label\"\n",
+        " Consort:0 \"Title label\"\n",
+        " STATIC_LABEL:0 \"Nested label\"\n",
+    );
+    host.open_document(id.clone(), 1, source.to_owned(), None)
+        .expect("open localisation");
+    let snapshot = host.snapshot();
+
+    for (name, label) in [
+        ("NUM", "Country label"),
+        ("VAL", "Other label"),
+        ("Consort", "Title label"),
+    ] {
+        let start = source.find(&format!("${name}$")).unwrap() as u32;
+        let result = hover(&snapshot, &id, start + 1).expect("runtime parameter hover");
+        assert!(
+            result.contents.starts_with(&format!("### `{name}`")),
+            "{}",
+            result.contents
+        );
+        assert!(
+            result
+                .contents
+                .contains("Localisation variable placeholder")
+        );
+        assert!(!result.contents.contains(label), "{}", result.contents);
+
+        let definition = source.find(&format!("{name}:0")).unwrap() as u32;
+        let result = hover(&snapshot, &id, definition + 1).expect("localisation key hover");
+        assert!(result.contents.contains(label), "{}", result.contents);
+    }
+    let nested = source.find("$STATIC_LABEL$").unwrap() as u32 + 2;
+    let result = hover(&snapshot, &id, nested).expect("nested key hover");
+    assert!(
+        result.contents.contains("Nested label"),
+        "{}",
+        result.contents
+    );
+}
+
+#[test]
+fn localisation_hover_covers_the_entire_formatted_placeholder() {
+    let mut host = eu4_host(game::eu4::bootstrap_rules());
+    let id = DocumentId::new("file:///tmp/localisation/formatted-parameters.yml");
+    let source = concat!(
+        "l_english:\n",
+        " sample:0 \"$VAL|Y$$RATE|%|Y|0$ $AMOUNT|¤0Y$\"\n",
+        " VAL:0 \"Unrelated key\"\n",
+        " RATE:0 \"Unrelated key\"\n",
+    );
+    host.open_document(id.clone(), 1, source.to_owned(), None)
+        .expect("open localisation");
+    let snapshot = host.snapshot();
+
+    for (name, format) in [("VAL", "Y"), ("RATE", "%|Y|0"), ("AMOUNT", "¤0Y")] {
+        let fragment = format!("${name}|{format}$");
+        let start = source.find(&fragment).unwrap();
+        let range = TextRange::new(start as u32, (start + fragment.len()) as u32);
+        for (offset, _) in fragment.char_indices() {
+            let position = (start + offset) as u32;
+            let result = hover(&snapshot, &id, position).expect("formatted parameter hover");
+            assert_eq!(result.range, range, "{fragment} at {offset}");
+            assert!(
+                result.contents.starts_with(&format!("### `{name}`")),
+                "{}",
+                result.contents
+            );
+            assert!(
+                result.contents.contains(&format!("Format: `{format}`")),
+                "{}",
+                result.contents
+            );
+            assert!(
+                !result.contents.contains("Unrelated key"),
+                "{}",
+                result.contents
+            );
+        }
+    }
+}
+
+#[test]
+fn localisation_hover_ignores_comments_escapes_and_text_between_references() {
+    let mut host = eu4_host(game::eu4::bootstrap_rules());
+    let id = DocumentId::new("file:///tmp/localisation/fragment-boundaries.yml");
+    let source = concat!(
+        "l_english:\n",
+        " # $comment_key$\n",
+        " example:0 \"$$escaped_key$$ $$VAL|Y$$ $BAD|[Root.GetName]$ $first$between_key$second$$third$\" # $inline_key$\n",
+        " comment_key:0 \"Comment text\"\n",
+        " inline_key:0 \"Inline comment text\"\n",
+        " escaped_key:0 \"Escaped text\"\n",
+        " between_key:0 \"Between text\"\n",
+        " first:0 \"First reference\"\n",
+        " second:0 \"Second reference\"\n",
+        " third:0 \"Third reference\"\n",
+    );
+    host.open_document(id.clone(), 1, source.to_owned(), None)
+        .expect("open localisation");
+    let snapshot = host.snapshot();
+
+    for (fragment, expected) in [
+        ("$first$", "First reference"),
+        ("$second$", "Second reference"),
+        ("$third$", "Third reference"),
+    ] {
+        let start = source.find(fragment).unwrap() as u32;
+        let result = hover(&snapshot, &id, start + 2).expect("reference hover");
+        assert!(
+            result.contents.contains(expected),
+            "{fragment}: {}",
+            result.contents
+        );
+        assert_eq!(
+            result.range,
+            TextRange::new(start, start + fragment.len() as u32)
+        );
+    }
+    for literal in [
+        "comment_key$",
+        "inline_key$",
+        "escaped_key$$",
+        "VAL|Y$$",
+        "BAD|[Root.GetName]$",
+        "between_key$",
+    ] {
+        let position = source.find(literal).unwrap() as u32 + 1;
+        let result = hover(&snapshot, &id, position);
+        assert!(result.is_none(), "{literal}: {result:?}");
+    }
 }
 
 #[test]

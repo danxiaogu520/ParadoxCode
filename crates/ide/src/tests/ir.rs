@@ -520,6 +520,242 @@ fn ir_country_tag_hover_resolves_optional_name_and_adjective() {
 }
 
 #[test]
+fn definition_hover_shows_only_allowlisted_event_fields() {
+    let mut host = host();
+    open(
+        &mut host,
+        "localisation/hover-fields_l_english.yml",
+        concat!(
+            "l_english:\n",
+            " title_key:0 \"Event title\"\n",
+            " description_key:0 \"Event description\"\n",
+            " conditional_key:0 \"Conditional description\"\n",
+            " first_option:0 \"First choice\"\n",
+            " second_option:0 \"Second choice\"\n",
+            " effect_tip:0 \"Effect tooltip\"\n",
+            " trigger_tip:0 \"Trigger tooltip\"\n",
+            " option_tip:0 \"Option tooltip\"\n",
+        ),
+    );
+    let source = concat!(
+        "country_event = { id = fields.1 title = \"title_key\" desc = description_key ",
+        "desc = { desc = conditional_key trigger = { always = yes } } ",
+        "trigger = { custom_trigger_tooltip = { tooltip = trigger_tip always = yes } } ",
+        "immediate = { custom_tooltip = effect_tip } ",
+        "option = { name = first_option custom_tooltip = option_tip } ",
+        "option = { name = second_option } }",
+    );
+    let id = open(&mut host, "events/hover-fields.txt", source);
+    let snapshot = host.snapshot();
+    let result =
+        hover(&snapshot, &id, source.find("fields.1").unwrap() as u32 + 1).expect("event hover");
+    for row in [
+        "| title | Event title |",
+        "| desc | Event description |",
+        "| conditional desc | Conditional description |",
+        "| option | First choice |",
+        "| option | Second choice |",
+    ] {
+        assert!(result.contents.contains(row), "{}", result.contents);
+    }
+    assert!(result.contents.find("First choice") < result.contents.find("Second choice"));
+    assert_eq!(
+        result.preview.unwrap().title.as_deref(),
+        Some("Event title")
+    );
+
+    for (key, text) in [
+        ("effect_tip", "Effect tooltip"),
+        ("trigger_tip", "Trigger tooltip"),
+        ("option_tip", "Option tooltip"),
+    ] {
+        assert!(!result.contents.contains(text), "{}", result.contents);
+        let direct = hover(&snapshot, &id, source.find(key).unwrap() as u32 + 1)
+            .expect("direct tooltip hover");
+        assert!(direct.contents.contains(text), "{}", direct.contents);
+    }
+}
+
+#[test]
+fn definition_hover_keeps_localised_bindings_and_fixed_list_members() {
+    let mut host = host();
+    open(
+        &mut host,
+        "localisation/religion-fields_l_english.yml",
+        "l_english:\n sample_faith:0 \"Faith name\"\n sample_faith_reform:0 \"Reform hint\"\n heresy_key:0 \"Heresy name\"\n",
+    );
+    let source = "sample_group = { sample_faith = { heretic = { heresy_key } reform_tooltip = sample_faith_reform } }";
+    let id = open(&mut host, "common/religions/hover-fields.txt", source);
+    let snapshot = host.snapshot();
+    let result = hover(
+        &snapshot,
+        &id,
+        source.find("sample_faith").unwrap() as u32 + 1,
+    )
+    .expect("religion hover");
+    for row in [
+        "| name | Faith name |",
+        "| reform_tooltip | Reform hint |",
+        "| heretic | Heresy name |",
+    ] {
+        assert!(result.contents.contains(row), "{}", result.contents);
+    }
+}
+
+#[test]
+fn ancestor_personality_explanation_is_a_localisation_reference() {
+    let mut host = host();
+    let localisation = open(
+        &mut host,
+        "localisation/ancestor-fields_l_english.yml",
+        "l_english:\n explanation_key:0 \"AI explanation\"\n",
+    );
+    let source = "sample_ancestor = { custom_ai_explanation = explanation_key }";
+    let id = open(
+        &mut host,
+        "common/ancestor_personalities/hover-fields.txt",
+        source,
+    );
+    let snapshot = host.snapshot();
+    let result = hover(&snapshot, &id, 2).expect("ancestor hover");
+    assert!(
+        result
+            .contents
+            .contains("| custom_ai_explanation | AI explanation |"),
+        "{}",
+        result.contents
+    );
+    let position = source.find("explanation_key").unwrap() as u32 + 1;
+    let targets = definition(&snapshot, &id, position);
+    assert!(
+        targets
+            .iter()
+            .any(|target| target.document.as_ref() == Some(&localisation))
+    );
+}
+
+#[test]
+fn localisation_hover_keeps_nested_cultures_out_of_the_group_preview() {
+    let mut host = host();
+    open(
+        &mut host,
+        "localisation/cultures_l_english.yml",
+        "l_english:\n sample_group:0 \"Group label\"\n sample_culture:0 \"Culture label\"\n",
+    );
+    let source = "sample_group = { sample_culture = {} }";
+    let id = open(&mut host, "common/cultures/labels.txt", source);
+    let trigger = "sample = { culture_group = sample_group }";
+    let trigger_id = open(&mut host, "common/scripted_triggers/labels.txt", trigger);
+    let snapshot = host.snapshot();
+
+    for (document, source, key, expected, unrelated) in [
+        (&id, source, "sample_group", "Group label", "Culture label"),
+        (
+            &id,
+            source,
+            "sample_culture",
+            "Culture label",
+            "Group label",
+        ),
+        (
+            &trigger_id,
+            trigger,
+            "sample_group",
+            "Group label",
+            "Culture label",
+        ),
+    ] {
+        let position = source.find(key).unwrap() as u32 + 1;
+        let result = hover(&snapshot, document, position).expect("culture hover");
+        assert!(
+            result.contents.contains(expected) && !result.contents.contains(unrelated),
+            "{key}: {}",
+            result.contents
+        );
+    }
+}
+
+#[test]
+fn localisation_hover_uses_the_event_declaration_under_the_cursor() {
+    let mut host = host();
+    open(
+        &mut host,
+        "localisation/events_l_english.yml",
+        "l_english:\n alternate_title:0 \"Alternate title\"\n original_title:0 \"Original title\"\n",
+    );
+    let alternate = "country_event = { id = sample.1 title = alternate_title }";
+    let original = "country_event = { id = sample.1 title = original_title }";
+    let alternate_id = open(&mut host, "events/alternate.txt", alternate);
+    let original_id = open(&mut host, "events/original.txt", original);
+    let caller =
+        "country_event = { id = caller.1 immediate = { country_event = { id = sample.1 } } }";
+    let caller_id = open(&mut host, "events/caller.txt", caller);
+    let snapshot = host.snapshot();
+
+    for (document, source, title, unrelated) in [
+        (
+            &alternate_id,
+            alternate,
+            "Alternate title",
+            "Original title",
+        ),
+        (&original_id, original, "Original title", "Alternate title"),
+    ] {
+        let position = source.find("sample.1").unwrap() as u32 + 1;
+        let result = hover(&snapshot, document, position).expect("event declaration hover");
+        assert!(result.contents.contains(title), "{}", result.contents);
+        assert!(!result.contents.contains(unrelated), "{}", result.contents);
+        let preview = result.preview.expect("event preview target");
+        assert_eq!(preview.title.as_deref(), Some(title));
+        assert_eq!(preview.location.document.as_ref(), Some(document));
+    }
+
+    let position = caller.find("sample.1").unwrap() as u32 + 1;
+    let result = hover(&snapshot, &caller_id, position).expect("ambiguous event reference hover");
+    assert!(
+        result.contents.contains("ambiguous event symbol"),
+        "{}",
+        result.contents
+    );
+    assert!(
+        !result.contents.contains("Localisation preview"),
+        "{}",
+        result.contents
+    );
+    assert!(result.preview.is_none());
+}
+
+#[test]
+fn localisation_hover_matches_the_whole_quoted_enum_value() {
+    let mut host = host();
+    open(
+        &mut host,
+        "localisation/attitudes_l_english.yml",
+        "l_english:\n attitude_friendly:0 \"Friendly label\"\n",
+    );
+    for (path, value, expected_label) in [
+        ("valid.txt", "attitude_friendly", true),
+        ("invalid.txt", "attitude_friendly extra", false),
+    ] {
+        let source =
+            format!("sample = {{ ai_attitude = {{ who = ROOT attitude = \"{value}\" }} }}");
+        let id = open(
+            &mut host,
+            &format!("common/scripted_triggers/{path}"),
+            &source,
+        );
+        let position = source.find("attitude_friendly").unwrap() as u32 + 1;
+        let result = hover(&host.snapshot(), &id, position).expect("enum value hover");
+        assert_eq!(
+            result.contents.contains("Friendly label"),
+            expected_label,
+            "{value}: {}",
+            result.contents
+        );
+    }
+}
+
+#[test]
 fn ir_hover_preserves_every_binding_label_for_identical_localisation_text() {
     let mut host = host();
     open(
