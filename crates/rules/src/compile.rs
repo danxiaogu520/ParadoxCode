@@ -2167,9 +2167,9 @@ fn is_ident(raw: &str) -> bool {
         && chars.all(|next| next.is_ascii_alphanumeric() || next == '_')
 }
 
-/// Structural equality of two field specifications, ignoring presentation
-/// fields (`doc`/`severity`/`deprecated`/`override`). Expressions compare as
-/// parsed syntax, so `'a|b'` and `'a | b'` are identical.
+/// Structural equality of two field specifications, ignoring documentation,
+/// diagnostic settings, deprecation metadata, and overrides. Expressions compare
+/// as parsed syntax, so `'a|b'` and `'a | b'` are identical.
 fn field_structure_eq(left: &FieldSpec, right: &FieldSpec) -> bool {
     fn expr_eq(left: &Option<String>, right: &Option<String>) -> bool {
         match (left, right) {

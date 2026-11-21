@@ -333,6 +333,7 @@ struct FieldKey {
     doc: Option<Symbol>,
     severity: Severity,
     deprecated: bool,
+    deprecation_diagnostic: Option<bool>,
     capabilities: Box<[Symbol]>,
     file: Symbol,
     pointer: Symbol,
@@ -1079,6 +1080,7 @@ impl<'a> Lowering<'a> {
             doc: None,
             severity: None,
             deprecated: None,
+            deprecation_diagnostic: None,
             override_field: None,
             capabilities: Vec::new(),
         };
@@ -1158,6 +1160,7 @@ impl<'a> Lowering<'a> {
             doc,
             severity: spec.severity.unwrap_or(Severity::Error),
             deprecated: spec.deprecated.unwrap_or(false),
+            deprecation_diagnostic: spec.deprecation_diagnostic.filter(|enabled| !enabled),
             capabilities: spec
                 .capabilities
                 .iter()
@@ -1176,6 +1179,7 @@ impl<'a> Lowering<'a> {
             doc: field.doc,
             severity: field.severity,
             deprecated: field.deprecated,
+            deprecation_diagnostic: field.deprecation_diagnostic,
             capabilities: field.capabilities.clone(),
             file: draft.at.file,
             pointer,

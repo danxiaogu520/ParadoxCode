@@ -265,6 +265,104 @@ fn semantic_hover_collapses_repeated_first_party_rule_rows() {
 }
 
 #[test]
+fn semantic_hover_shows_government_reform_references_without_an_enum() {
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("load first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/reform_hover.txt");
+    let text = "country_event = {
+        trigger = { has_reform = sample_reform }
+        immediate = {
+            add_government_reform = sample_reform
+            remove_government_reform = sample_reform
+        }
+    }";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open government reform fixture");
+    let snapshot = host.snapshot();
+    for key in [
+        "has_reform",
+        "add_government_reform",
+        "remove_government_reform",
+    ] {
+        let position = u32::try_from(text.find(key).expect("reform key") + 1).expect("position");
+        let hover = hover(&snapshot, &id, position).expect("reform hover");
+        assert!(
+            hover
+                .contents
+                .contains("- value: a `government_reform` instance")
+                && !hover.contents.contains("Allowed value types"),
+            "{key}: {}",
+            hover.contents
+        );
+    }
+}
+
+#[test]
+fn legacy_government_rules_show_deprecation_and_only_validate_typed_references() {
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("load first-party rules"));
+    let cases: &[(&str, &str, &[&str])] = &[
+        (
+            "common/governments/legacy.txt",
+            "fixture_government = { legacy_government = { custom_legacy } }
+             pre_dharma_mapping = { old_save_id = {
+                 government = fixture_government
+                 legacy_government = custom_legacy
+             } }",
+            &["pre_dharma_mapping", "legacy_government"],
+        ),
+        (
+            "common/government_reforms/legacy.txt",
+            "fixture_reform = {
+                 legacy_government = custom_marker
+                 legacy_equivalent = missing_reform
+             }",
+            &["legacy_government", "legacy_equivalent"],
+        ),
+        (
+            "events/legacy.txt",
+            "country_event = { immediate = { set_legacy_government = custom_legacy } }",
+            &["set_legacy_government"],
+        ),
+        (
+            "history/countries/F00 - Legacy.txt",
+            "set_legacy_government = custom_legacy",
+            &["set_legacy_government"],
+        ),
+    ];
+    let ids: Vec<_> = cases
+        .iter()
+        .map(|(path, source, _)| {
+            let id = DocumentId::new(format!("file:///tmp/{path}"));
+            host.open_document(id.clone(), 1, (*source).to_owned(), None)
+                .expect("open legacy government fixture");
+            id
+        })
+        .collect();
+    let snapshot = host.snapshot();
+    for ((path, source, keys), id) in cases.iter().zip(&ids) {
+        for key in *keys {
+            let position = u32::try_from(source.find(key).expect("legacy key") + 1).unwrap();
+            let result = hover(&snapshot, id, position).expect("legacy government hover");
+            assert!(
+                result.contents.contains("Deprecated"),
+                "{}",
+                result.contents
+            );
+        }
+        let results = diagnostics(&snapshot, id);
+        let invalid_values: Vec<_> = results
+            .iter()
+            .filter(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue)
+            .collect();
+        if source.contains("missing_reform") {
+            assert_eq!(invalid_values.len(), 1, "{results:?}");
+            assert!(invalid_values[0].message.contains("missing_reform"));
+        } else {
+            assert!(invalid_values.is_empty(), "{path}: {results:?}");
+        }
+    }
+}
+
+#[test]
 fn semantic_hover_preserves_rule_detail_line_breaks() {
     let mut host = fixture_host(
         serde_json::json!({"schemas": {"trigger": {"fields": {"documented": {"value": "bool", "doc": "First line\nSecond line"}}}}}),
