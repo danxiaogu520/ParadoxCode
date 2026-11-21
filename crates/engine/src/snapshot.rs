@@ -232,6 +232,25 @@ impl AnalysisSnapshot {
         self.documents.get(id)
     }
 
+    /// Resolves the rule path for an open or indexed document.
+    #[must_use]
+    pub fn logical_path_for_document(&self, document: &DocumentSnapshot) -> Option<LogicalPath> {
+        document
+            .path
+            .as_deref()
+            .and_then(|path| self.source_file_id_for_path(path))
+            .and_then(|id| self.source_files.get(&id))
+            .map(|file| file.logical_path.clone())
+            .or_else(|| {
+                index::logical_path_for_document(
+                    &self.rules,
+                    &self.roots,
+                    document.id(),
+                    document.path.as_deref(),
+                )
+            })
+    }
+
     /// Returns all discovered source files.
     #[must_use]
     pub fn source_files(&self) -> &BTreeMap<SourceFileId, SourceFile> {

@@ -4,7 +4,10 @@
 //! the embedded first-party IR bootstrap, and the structured mission model. Production data
 //! lives under `rules/eu4`.
 
+mod format;
 pub mod mission;
+
+pub use format::format_document;
 
 use std::sync::OnceLock;
 

@@ -45,6 +45,11 @@ Localisation is indexed for lookup/navigation and receives transparent-encoding 
 it does not publish server diagnostics or completion items. Script rename is restricted to writable
 Mod sources, and formatting refuses malformed input it cannot safely preserve.
 
+Document and workspace formatting use the same EU4 list layouts. Mission prerequisites expand
+from two entries, fixed vectors such as colours and coordinates stay together, and long province
+lists wrap in groups. Formatting also expands complex Script blocks inside single-line quoted
+arguments. Workspace formatting applies to UTF-8 scripts on disk.
+
 ## Search
 
 Use the editor-title search button or **ParadoxCode: Search** to open the retained search panel.

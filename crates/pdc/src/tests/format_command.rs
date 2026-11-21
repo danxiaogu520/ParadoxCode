@@ -140,10 +140,11 @@ fn format_workspace_rewrites_scripts_and_reports_a_summary() {
 #[test]
 fn format_workspace_rewrites_files_backing_open_documents() {
     let (root, root_uri) = temp_workspace_dir();
-    let events = root.join("events");
-    fs::create_dir_all(&events).expect("events directory");
-    let source = events.join("open-messy.txt");
-    fs::write(&source, "root = {\r\n  child = yes\r\n}\r\n").expect("messy source");
+    let missions = root.join("missions");
+    fs::create_dir_all(&missions).expect("missions directory");
+    let source = missions.join("open-messy.txt");
+    let original = "series = {\r\n  task = { required_missions={a b} }\r\n}\r\n";
+    fs::write(&source, original).expect("messy source");
     let uri = canonical_uri(&source);
     let input = frames([
         json!({
@@ -161,7 +162,7 @@ fn format_workspace_rewrites_files_backing_open_documents() {
             "method": "textDocument/didOpen",
             "params": {
                 "textDocument": {"uri": uri, "languageId": "eu4", "version": 1,
-                                 "text": "root = {\r\n  child = yes\r\n}\r\n"}
+                                 "text": original}
             }
         }),
         json!({
@@ -187,7 +188,7 @@ fn format_workspace_rewrites_files_backing_open_documents() {
     assert_eq!(format["result"]["formattedFiles"], 1);
     assert_eq!(
         fs::read_to_string(&source).expect("overlay-backed file survives"),
-        "ROOT = { child = yes }\n"
+        "series = {\n\ttask = {\n\t\trequired_missions = {\n\t\t\ta\n\t\t\tb\n\t\t}\n\t}\n}\n"
     );
     fs::remove_dir_all(root).expect("cleanup");
 }

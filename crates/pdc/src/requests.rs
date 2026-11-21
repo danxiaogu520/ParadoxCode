@@ -28,7 +28,6 @@ use lsp_types::{
     SemanticTokensRangeParams, SemanticTokensRangeResult, SymbolInformation,
     TextDocumentPositionParams, TextEdit, Uri, WorkspaceEdit, WorkspaceSymbolParams,
 };
-use parser::format::format;
 use rules::ParserKind;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -1939,7 +1938,8 @@ impl SnapshotRequestContext {
             return typed_value(Vec::<TextEdit>::new(), "formatting response");
         };
         let _client_options = params.options;
-        let result = format(parsed);
+        let logical_path = self.snapshot.logical_path_for_document(document);
+        let result = game::eu4::format_document(parsed, logical_path.as_ref(), self.snapshot.ir());
         self.ensure_active()?;
         let edits = result
             .edits
