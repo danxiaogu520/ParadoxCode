@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-22
+
 ### Changed
 
 - EU4 script hover groups allowed values by their valid scopes and shows known scope registers
@@ -1529,7 +1531,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.6...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.6...v0.6.0
 [0.5.6]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.5.3...v0.5.4
