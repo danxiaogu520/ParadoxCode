@@ -4,7 +4,7 @@ use super::render::{HoverModel, code_span};
 use crate::support::{ParsedInput, contains};
 use crate::types::{CancellationToken, Cancelled};
 use engine::{AnalysisSnapshot, SourceRootKind};
-use rules::ir::{FieldId, FieldValue, Matcher, MatcherId, RefTarget, RulesIr};
+use rules::ir::{FieldId, FieldValue, Matcher, MatcherId, RefTarget, RulesIr, ValueType};
 use std::collections::{BTreeMap, BTreeSet};
 use text::TextSize;
 
@@ -542,6 +542,15 @@ fn value_scope_table(ir: &RulesIr, fields: &[FieldId]) -> String {
                 allowed.extend(scopes.iter().copied());
             }
         };
+        if !field.value_types.is_empty() {
+            for value_type in &field.value_types {
+                add_value(match *value_type {
+                    ValueType::Alias(name) => code_span(ir.strings().resolve(name)),
+                    ValueType::Matcher(matcher) => value_label(ir, matcher),
+                });
+            }
+            continue;
+        }
         match field.value {
             FieldValue::Scalar(matcher) => match ir.matcher(matcher) {
                 Matcher::Union(alternatives) => {

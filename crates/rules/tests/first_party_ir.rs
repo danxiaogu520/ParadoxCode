@@ -3,7 +3,8 @@ use std::path::Path;
 use std::sync::OnceLock;
 
 use rules::ir::{
-    DefName, FieldId, NoSymbolFacts, RootRule, RulesIr, SchemaId, Shape, SymbolFacts, TypeId,
+    DefName, FieldId, FieldValue, NoSymbolFacts, RootRule, RulesIr, SchemaId, Shape, SymbolFacts,
+    TypeId,
 };
 use rules::source::ControlKind;
 use text::LogicalPath;
@@ -307,6 +308,40 @@ fn modifier_key_queries_preserve_all_dynamic_families_and_scopes() {
     }
 }
 
+fn typed_target_fields_validate_the_value_scope() {
+    let ir = ir();
+    for (schema_name, key) in [
+        ("trigger", "alliance_with"),
+        ("trigger", "controlled_by"),
+        ("trigger", "absolutism"),
+        ("trigger", "monthly_income"),
+        ("trigger", "owned_by"),
+        ("trigger", "total_own_and_non_tributary_subject_development"),
+        ("trigger__has_trade_modifier", "who"),
+        ("effect__add_trade_modifier", "who"),
+    ] {
+        let field = exact(ir, schema(ir, schema_name), key, Shape::Scalar);
+        let FieldValue::Scalar(matcher) = ir.field(field).value else {
+            panic!("expected a scalar target for {schema_name}.{key}");
+        };
+        assert!(
+            ir.scalar_matches(matcher, "owner", &NoSymbolFacts),
+            "{schema_name}.{key}"
+        );
+        assert!(
+            !ir.scalar_matches(matcher, "capital_scope", &NoSymbolFacts),
+            "{schema_name}.{key}"
+        );
+    }
+
+    let owns = exact(ir, schema(ir, "trigger"), "owns", Shape::Scalar);
+    let FieldValue::Scalar(matcher) = ir.field(owns).value else {
+        panic!("expected a scalar province target for owns");
+    };
+    assert!(ir.scalar_matches(matcher, "capital_scope", &NoSymbolFacts));
+    assert!(!ir.scalar_matches(matcher, "owner", &NoSymbolFacts));
+}
+
 // One corpus load per test process; each helper keeps its behavior assertions.
 #[test]
 fn first_party_behavior_contracts() {
@@ -315,4 +350,5 @@ fn first_party_behavior_contracts() {
     inherited_modifiers_and_numeric_trigger_domains_validate_values();
     government_power_commands_accept_fractional_values();
     modifier_key_queries_preserve_all_dynamic_families_and_scopes();
+    typed_target_fields_validate_the_value_scope();
 }

@@ -367,6 +367,9 @@ pub struct Field {
     pub key: MatcherId,
     /// What the value is.
     pub value: FieldValue,
+    /// Display alternatives for a scalar expression with named groups.
+    #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
+    pub value_types: Box<[ValueType]>,
     /// Cardinality.
     pub card: Card,
     /// Scope effect.
@@ -398,6 +401,15 @@ pub enum FieldValue {
     Block(SchemaId),
     /// A nested block reusing the enclosing schema.
     SelfBlock,
+}
+
+/// One displayed alternative of a scalar field's value expression.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub enum ValueType {
+    /// The name of an alias used by the field.
+    Alias(Symbol),
+    /// An alternative declared directly on the field.
+    Matcher(MatcherId),
 }
 
 /// The shape a field's value takes, for §3.2 dispatch.

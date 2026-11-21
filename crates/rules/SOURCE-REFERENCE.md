@@ -9,12 +9,13 @@ Each object below comes from the compiler's generated JSON Schema. `Required` an
 
 ## RuleFile
 
-One rules source file: any subset of the seven top-level sections. The
+One rules source file: any subset of the top-level sections. The
 compiler merges same-named sections across files into one namespace per
 section and rejects duplicate names.
 
 | Field | Required | Source default | Shape | Meaning |
 | --- | --- | --- | --- | --- |
+| `aliases` | no | `{}` | `{"additionalProperties":{"type":"string"},"type":"object"}` | Named type expressions expanded by `alias<name>`. |
 | `enums` | no | `{}` | `{"additionalProperties":{"$ref":"#/$defs/EnumSpec"},"type":"object"}` | Enums as literal member lists. |
 | `files` | no | `{}` | `{"additionalProperties":{"$ref":"#/$defs/FileRule"},"type":"object"}` | Path-selection rules: logical path → parser / root schema. |
 | `mixins` | no | `{}` | `{"additionalProperties":{"$ref":"#/$defs/MixinSpec"},"type":"object"}` | Pure structural field bundles, expanded at compile time. |

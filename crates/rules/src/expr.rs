@@ -28,6 +28,34 @@ pub struct Expr {
     pub alternatives: Vec<Primary>,
 }
 
+impl Expr {
+    pub(crate) fn expand_aliases<E>(
+        self,
+        resolve: &mut impl FnMut(&str) -> Result<Self, E>,
+    ) -> Result<Self, E> {
+        let mut alternatives = Vec::with_capacity(self.alternatives.len());
+        for primary in self.alternatives {
+            match primary {
+                Primary::Alias(name) => alternatives.extend(resolve(&name)?.alternatives),
+                Primary::Literal(parts) => {
+                    let parts = parts
+                        .into_iter()
+                        .map(|part| match part {
+                            LiteralPart::Hole(hole) => {
+                                hole.expand_aliases(resolve).map(LiteralPart::Hole)
+                            }
+                            part => Ok(part),
+                        })
+                        .collect::<Result<_, _>>()?;
+                    alternatives.push(Primary::Literal(parts));
+                }
+                primary => alternatives.push(primary),
+            }
+        }
+        Ok(Self { alternatives })
+    }
+}
+
 /// One alternative of an [`Expr`]: one `prim [range]`, `ctor<arg>`, `path`,
 /// literal, or bare parameter.
 #[derive(Clone, Debug, PartialEq)]
@@ -45,6 +73,8 @@ pub enum Primary {
     Enum(Argument),
     /// `scope<country>`: a scope expression.
     Scope(Argument),
+    /// `alias<country>`: a named expression to expand before semantic checks.
+    Alias(String),
     /// `path` or `path<gfx>`: a file-path scalar, optionally a path category.
     Path { category: Option<String> },
     /// `'yes'` (constant) or `'monthly_{ref<power>}'` (template).
@@ -377,6 +407,12 @@ impl<'source> Cursor<'source> {
                             QueryProjection::Values
                         };
                         self.parse_query(projection).map(Primary::Query)
+                    }
+                    "alias" => {
+                        self.expect('<')?;
+                        let name = self.read_ident()?;
+                        self.expect('>')?;
+                        Ok(Primary::Alias(name))
                     }
                     "path" => {
                         self.skip_whitespace();

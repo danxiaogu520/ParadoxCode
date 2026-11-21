@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// One rules source file: any subset of the seven top-level sections. The
+/// One rules source file: any subset of the top-level sections. The
 /// compiler merges same-named sections across files into one namespace per
 /// section and rejects duplicate names.
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -32,6 +32,9 @@ pub struct RuleFile {
     /// Pure structural field bundles, expanded at compile time.
     #[serde(default)]
     pub mixins: BTreeMap<String, MixinSpec>,
+    /// Named type expressions expanded by `alias<name>`.
+    #[serde(default)]
+    pub aliases: BTreeMap<String, String>,
     /// Symbol namespaces: resolution / subtypes / open / builtin / impl.
     #[serde(default)]
     pub types: BTreeMap<String, TypeSpec>,

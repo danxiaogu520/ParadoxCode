@@ -18,21 +18,21 @@ Non-JSON files are ignored; symbolic links are rejected to prevent aliases and
 cycles. Package identity (`source_format_version`, `game_id`, and optional
 `target_game_version`) lives in `game.json`; another source format version is
 rejected. Identity metadata is separate from the runtime profile and language IR.
-Each source file MAY contain any subset
-of seven top-level sections:
+Each source file MAY contain any subset of the top-level sections.
 
 | Section | Contents |
 |---|---|
 | `files` | Path selection → parser / root schema |
 | `schemas` | Structure: `fields` / `patterns` / `items` / `include` / `def` / parameters |
 | `mixins` | Pure structural field bundles (expanded at compile time) |
+| `aliases` | Named type expressions expanded at compile time |
 | `types` | Symbol namespaces: `resolution` / `subtypes` / `open` / `builtin` / `impl` |
 | `traits` | Named trait markers; implementation data belongs to `types.*.impl` |
 | `enums` | Literal member lists |
 | `scopes` | Scope types / registers / links / compat |
 
 The compiler merges the same-named section across all files into one namespace.
-A name defined twice — a duplicate schema, mixin, type, enum, trait, files
+A name defined twice — a duplicate schema, mixin, alias, type, enum, trait, files
 entry, or scope declaration — is an error; there is no shadowing or override
 between files.
 
@@ -70,7 +70,8 @@ JSON pointer + column within the expression** (for example: `events.json`,
 
 ```ebnf
 expr      = alt { "|" alt } ;
-alt       = prim [ range ] | ctor "<" arg ">" | "path" [ "<" name ">" ] | query | literal | param ;
+alt       = prim [ range ] | ctor "<" arg ">" | "path" [ "<" name ">" ]
+          | "alias" "<" name ">" | query | literal | param ;
 query     = ("keysof" | "valuesof") "<" name { "," filter } ">" ;
 filter    = "scope_accepts" "=" name | "shape" "=" ("scalar" | "block")
           | "value_kind_any" "=" "(" kind { "|" kind } ")"
@@ -138,6 +139,7 @@ lexical rules are normative:
 | `def<country_flag>` | **Defines** a symbol at this position |
 | `enum<country_tags>` | Enum member |
 | `scope<country>` `scope<any>` | Scope expression (register, link, tag, …) |
+| `alias<country>` | Named type expression (§2.4) |
 | `link` | Key position only: any scope link / register / prefix link (§8) |
 | `opaque` | Unchecked text |
 | `a\|b` | Union, tried in written order |
@@ -219,6 +221,28 @@ unsupported contexts, and cyclic projected-matcher dependencies are compile
 errors. Ordinary recursive block bodies and queries projecting a schema's
 independent literal keys remain valid. The legacy `control.selector_schema`
 compatibility path uses this same field-query evaluator.
+
+### 2.4 Named type expressions
+
+An entry in `aliases` defines a type expression under a case-insensitive name.
+Use `alias<name>` in a type expression, including inside a union or a template
+hole. Aliases can refer to declarations in any source file. The compiler
+rejects undefined alias names and cycles, including in unused declarations.
+
+```json
+{
+  "aliases": {
+    "country": "scope<country> | ref<country_tag>",
+    "province": "scope<province> | ref<province_id>"
+  }
+}
+```
+
+The compiler inserts each alternative in written order at the point of use.
+For example, `int | alias<country>` expands to `int | scope<country> | ref<country_tag>`.
+The resulting expression uses the rules of its surrounding field or template.
+For a scalar field value, hover shows a top-level alias by name alongside any
+alternatives declared directly on the field.
 
 ## 3. Schemas
 
@@ -752,7 +776,7 @@ precise validation is `rulec`'s job (an accepted trade-off).
   literal values, and schema shorthands. Configuration files are not rewritten.
 - `rulec fmt <source-dir> --expanded` mechanically spells out defaults on the
   source structures. Absent optional mechanisms remain `null`; required
-  `card` values are retained. It does not expand mixins or monomorphise schemas.
+  `card` values are retained. Aliases, mixins, and parameterised schemas stay in source form.
 - `--check` may be combined with either formatting mode: it reports files
   requiring changes and exits non-zero without writing. Parsing and rendering
   of the entire bundle finish before a write begins, so invalid JSON in a later
@@ -794,8 +818,8 @@ script keys, scopes, definitions or references.
 |---|---|---|
 | Parse error | error | An illegal identifier or number; a range after a primitive other than `int`/`float`; non-whole `int` bounds or a lower bound above its upper bound; an invalid escape; an unterminated literal or hole; an invalid `arg`; an empty union branch; a union mixing scalar and quoted branches (§2); a malformed link-key template, schema reference, `card`, or `def` name; a missing `card`; a `script` files entry without `root`; a `map` without exactly one of `value`/`body`; a trait binding without exactly one of `loc`/`sprite` |
 | `CardLint` | warning / info | `card` is `0..0` (warning: disables the field rather than bounding it), `N..N` (info: a fixed-length tuple better written as `list` plus the arity), or two overloads of one key disagree on the upper bound (info) |
-| `DuplicateName` | error | A schema, mixin, type, enum, trait, files entry, or scope declaration is defined twice across sources (§1) |
-| `UndefinedReference` | error | A referenced schema, type, enum, mixin, or trait is not defined (check 1) |
+| `DuplicateName` | error | A schema, mixin, alias, type, enum, trait, files entry, or scope declaration is defined twice (§1) |
+| `UndefinedReference` | error | A referenced schema, type, enum, mixin, trait, or alias is not defined (§2.4, check 1) |
 | `UnusedDefinition` | warning | A definition is never referenced (check 1) |
 | `IncludeConflict` | error | Two mixins, or a mixin and the schema, declare the same key without an `"override": true` schema field; or two mixins conflict (check 2) |
 | `UnreachableOverload` | error | A same-key same-shape overload, or a later pattern, is fully shadowed (check 3) |

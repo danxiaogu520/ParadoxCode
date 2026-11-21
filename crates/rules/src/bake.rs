@@ -42,6 +42,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn nested_aliases_bake_to_the_inline_matchers() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(
+            root.join("game.json"),
+            r#"{"game_id":"test","source_format_version":14}"#,
+        )
+        .unwrap();
+        let source = r#"{
+            "files": {"test": {"path": "test", "root": "test"}},
+            "schemas": {"test": {"fields": {
+                "value": {"value": "'outer:{alias<choice>}' | int", "card": "0..1"}
+            }}}
+        }"#;
+        let inline = source.replace("alias<choice>", "'first' | 'second' | bool");
+        std::fs::write(root.join("rules.json"), inline).unwrap();
+        let expected = compile(root).unwrap();
+
+        std::fs::write(root.join("rules.json"), source).unwrap();
+        std::fs::write(
+            root.join("aliases.json"),
+            r#"{"aliases": {"choice": "alias<words> | bool", "words": "'first' | 'second'"}}"#,
+        )
+        .unwrap();
+        let actual = compile(root).unwrap();
+        assert!(actual.bytes == expected.bytes);
+    }
+
+    #[test]
     fn representative_bake_is_reproducible_and_round_trips() {
         // Corpus acceptance remains covered by lower::tests and first_party_ir.
         // Reproducible serialization needs representative fields, not two full

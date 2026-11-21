@@ -1,0 +1,11 @@
+{
+  "aliases": {
+    "country": "scope<country> | ref<country_tag>",
+    "culture": "ref<culture> | enum<culture_new_variables> | alias<country> | alias<province>",
+    "modifier": "ref<event_modifier> | ref<static_modifier>",
+    "personality": "ref<ruler_personality> | 'ancestor_{ref<ancestor_personality>}_personality'",
+    "province": "scope<province> | ref<province_id>",
+    "religion": "ref<religion> | enum<religion_new_variables> | alias<country> | alias<province>",
+    "treaty": "ref<peace_treaty> | enum<peace_options>"
+  }
+}
