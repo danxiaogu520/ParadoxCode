@@ -40,13 +40,15 @@ ship a failing change or skip a release gate. Create an issue immediately afterw
 ## Releases and credentials
 
 Version tags and published releases are immutable. The release workflow uses the repository's
-short-lived `GITHUB_TOKEN`; Marketplace credentials are kept outside the repository and used only
-for the audited manual publishing step. Maintainers follow `RELEASING.md` for every release.
+short-lived `GITHUB_TOKEN`. The approved `marketplace` job obtains its own short-lived publishing
+credential through the publisher's Trusted Publishing policy. Maintainers follow `RELEASING.md`
+for every release.
 Candidate preparation has read-only GitHub permissions and creates no formal tag. Complete CI
 receipts must come from successful manual Full CI on the exact reviewed main commit.
 The reduced core merge check and validation-only branch runs cannot authorize a release. Formal tags are created only after a candidate's
 complete payload, remote staging uploads and publication prerequisites pass. Promotion publishes
-the same artifact bytes; formal tag reservation and immutable publication are the final mutations.
+the same artifact bytes. Formal tag reservation and immutable publication are the final GitHub
+mutations, followed by the approved Marketplace deployment of the same VSIX.
 
 Licensed game installations are local development inputs, not repository or CI assets. Vanilla
 files, excerpts, diagnostic reports, and sweep output must not be uploaded to GitHub Actions,
