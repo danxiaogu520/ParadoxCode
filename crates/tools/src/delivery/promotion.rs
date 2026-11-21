@@ -407,15 +407,19 @@ pub(super) fn verify_ci_vsix(
     assets: &[Asset],
     version: &str,
 ) -> Result<(), String> {
-    let name = format!("paradoxcode-vscode-{version}.vsix");
-    let vsix = assets
-        .iter()
-        .find(|asset| asset.name == name)
-        .ok_or("candidate lacks the CI-validated VSIX")?;
+    let vsix = candidate_vsix_asset(assets, version)?;
     require(
         vsix.bytes == ci.vsix.bytes && vsix.sha256 == ci.vsix.sha256,
         "candidate VSIX differs from its Full CI receipt",
     )
+}
+
+fn candidate_vsix_asset<'a>(assets: &'a [Asset], version: &str) -> Result<&'a Asset, String> {
+    let name = format!("paradoxcode-vscode-{version}.vsix");
+    assets
+        .iter()
+        .find(|asset| asset.name == name)
+        .ok_or_else(|| "candidate lacks the CI-validated VSIX".into())
 }
 
 fn verify_candidate_ci(ci: &CiReceipt, candidate: &Candidate) -> Result<(), String> {
@@ -508,6 +512,11 @@ pub(super) fn promote(root: &Path, args: &Args) -> Result<String, String> {
         ],
     )?;
     let tag = format!("v{}", candidate.version);
+    let vsix = candidate_vsix_asset(&candidate.assets, &candidate.version)?;
+    let marketplace_inputs = &[
+        ("release_tag", tag.clone()),
+        ("vsix_sha256", vsix.sha256.clone()),
+    ];
     let release_path = format!("repos/{repository}/releases/tags/{tag}");
     let notes =
         fs::read_to_string(destination.join("release-notes.md")).map_err(|e| e.to_string())?;
@@ -529,6 +538,7 @@ pub(super) fn promote(root: &Path, args: &Args) -> Result<String, String> {
             )?;
             // Verification-only retries do not depend on an advisory endpoint;
             // the identical immutable version is already publicly available.
+            output(marketplace_inputs)?;
             return Ok(format!(
                 "{tag} is already published with the identical verified payload"
             ));
@@ -708,6 +718,7 @@ pub(super) fn promote(root: &Path, args: &Args) -> Result<String, String> {
     )?;
     remote_notes_match(&published, &tag, &notes)?;
     remote_assets_match(&published, &candidate.assets, true)?;
+    output(marketplace_inputs)?;
     Ok(format!(
         "{tag} published from candidate run {id}; all artifact bytes reused unchanged"
     ))

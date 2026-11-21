@@ -12,6 +12,7 @@ fn setup() -> (tempfile::TempDir, std::path::PathBuf) {
     .unwrap();
     fs::create_dir_all(root.path().join("target/mock/bin")).unwrap();
     let mock = root.path().join("target/mock");
+    fs::write(mock.join("github-output"), "").unwrap();
     let (mut candidate, envelope) = candidate(root.path());
     let proof = receipt(root.path());
     candidate.source_sha = proof.tested_sha.clone();
@@ -165,6 +166,7 @@ fn command(root: &Path, mock: &Path) -> Command {
         .env("GITHUB_REPOSITORY", "owner/repo")
         .env("GITHUB_EVENT_NAME", "workflow_dispatch")
         .env("GITHUB_REF", "refs/heads/main")
+        .env("GITHUB_OUTPUT", mock.join("github-output"))
         .env("GH_TOKEN", "mock-publication-credential")
         .env("GITHUB_TOKEN", "mock-publication-credential");
     command
@@ -201,6 +203,7 @@ fn audit_failure_creates_no_tag_and_no_draft() {
     );
     assert!(git(root.path(), &["tag", "--list"]).unwrap().is_empty());
     assert!(!mock.join("state.json").exists());
+    assert!(fs::read(mock.join("github-output")).unwrap().is_empty());
 }
 #[test]
 fn interrupted_upload_resumes_identical_bytes_and_published_retry_is_idempotent() {
@@ -219,12 +222,33 @@ fn interrupted_upload_resumes_identical_bytes_and_published_retry_is_idempotent(
     let state = report::json(&mock.join("state.json")).unwrap();
     assert_eq!(state["draft"], false);
     assert_eq!(state["assets"].as_array().unwrap().len(), 11);
+    let model = report::json(&mock.join("model.json")).unwrap();
+    let vsix = model["assets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|asset| asset["name"] == "paradoxcode-vscode-1.2.3.vsix")
+        .unwrap();
+    let marketplace_inputs = format!(
+        "release_tag=v1.2.3\nvsix_sha256={}\n",
+        vsix["sha256"].as_str().unwrap()
+    );
+    let github_output = mock.join("github-output");
+    assert_eq!(
+        fs::read_to_string(&github_output).unwrap(),
+        marketplace_inputs
+    );
+    fs::write(&github_output, "").unwrap();
     let mutations = state["mutations"].clone();
     let output = command(root.path(), &mock)
         .env("AUDIT_FAIL", "1")
         .output()
         .unwrap();
     assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        fs::read_to_string(&github_output).unwrap(),
+        marketplace_inputs
+    );
     assert_eq!(
         report::json(&mock.join("state.json")).unwrap()["mutations"],
         mutations
