@@ -416,6 +416,10 @@ pub struct TypeSpec {
     /// Traits implemented by this type and their arguments.
     #[serde(default, rename = "impl")]
     pub trait_impls: BTreeMap<String, ImplSpec>,
+    /// Explicit localisation fields in definition hovers, as dotted relative paths mapped to
+    /// row labels. A trailing `[]` selects bare list members.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub hover_localisation: BTreeMap<String, String>,
 }
 
 /// The conflict behavior of a symbol type.

@@ -598,6 +598,7 @@ One symbol namespace.
 | Field | Required | Source default | Shape | Meaning |
 | --- | --- | --- | --- | --- |
 | `builtin` | no | `null` | `{"items":{"type":"string"},"type":["array","null"]}` | Engine-provided members. |
+| `hover_localisation` | no | — | `{"additionalProperties":{"type":"string"},"type":"object"}` | Explicit localisation fields in definition hovers, as dotted relative paths mapped to row labels. A trailing `[]` selects bare list members. |
 | `impl` | no | `{}` | `{"additionalProperties":{"$ref":"#/$defs/ImplSpec"},"type":"object"}` | Traits implemented by this type and their arguments. |
 | `open` | no | `null` | `{"type":["boolean","null"]}` | Open world: any name may exist; `ref` never reports undefined names. |
 | `resolution` | no | `null` | `{"anyOf":[{"$ref":"#/$defs/TypeResolution"},{"type":"null"}]}` | Conflict behavior; defaults to `independent`. |

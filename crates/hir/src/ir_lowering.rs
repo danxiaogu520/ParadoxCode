@@ -467,15 +467,20 @@ fn descend(
     if let Some(matcher) = ir.schema(schema).items {
         // Only direct list members use this matcher. Nested properties own
         // their values, even when they also contain unkeyed list elements.
-        for item in bare_values.iter().filter(|item| {
-            item.range.start() >= container_range.start()
-                && item.range.end() <= container_range.end()
-                && !indices.iter().any(|index| {
-                    let child = &props[*index];
-                    child.range.start() <= item.range.start()
-                        && item.range.end() <= child.range.end()
-                })
-        }) {
+        let first =
+            bare_values.partition_point(|item| item.range.start() < container_range.start());
+        for item in bare_values[first..]
+            .iter()
+            .take_while(|item| item.range.start() < container_range.end())
+            .filter(|item| {
+                item.range.end() <= container_range.end()
+                    && !indices.iter().any(|index| {
+                        let child = &props[*index];
+                        child.range.start() <= item.range.start()
+                            && item.range.end() <= child.range.end()
+                    })
+            })
+        {
             collect_matcher_refs(ir, matcher, &item.value, item.range, facts, out);
         }
     }
@@ -1100,7 +1105,13 @@ fn lower_field_candidate(
                 state: child_state.clone(),
             });
         }
-        if !children[index].is_empty() {
+        // An explicit localisation list can have no keyed children to drive descent.
+        if !children[index].is_empty()
+            || ir
+                .schema(child_schema)
+                .items
+                .is_some_and(|matcher| matcher_has_localisation_reference(ir, matcher))
+        {
             descend(
                 ir,
                 path,
@@ -2166,6 +2177,20 @@ fn matcher_has_reference(ir: &RulesIr, id: MatcherId) -> bool {
         _ => false,
     }
 }
+
+fn matcher_has_localisation_reference(ir: &RulesIr, id: MatcherId) -> bool {
+    match ir.matcher(id) {
+        Matcher::Loc => true,
+        Matcher::Ref(RefTarget::Type { type_id, .. }) => {
+            ir.strings.resolve(ir.type_info(*type_id).name) == "localisation"
+        }
+        Matcher::Union(items) => items
+            .iter()
+            .any(|item| matcher_has_localisation_reference(ir, *item)),
+        _ => false,
+    }
+}
+
 fn matcher_has_pattern(ir: &RulesIr, id: MatcherId) -> bool {
     match ir.matcher(id) {
         Matcher::Pattern(_) => true,

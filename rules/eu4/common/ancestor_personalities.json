@@ -30,7 +30,7 @@
         },
         "custom_ai_explanation": {
           "card": "0..1",
-          "value": "scalar"
+          "value": "loc"
         },
         "different_religion_war_multiplier": {
           "card": "0..1",

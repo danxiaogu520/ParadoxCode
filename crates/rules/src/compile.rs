@@ -936,6 +936,28 @@ impl<'a> Checker<'a> {
                 self.forbid_params(&at.child("builtin"), builtin, "a builtin member");
             }
             self.collect_trait_impls(&at, &spec.trait_impls);
+            for (path, label) in &spec.hover_localisation {
+                let valid_path = path
+                    .strip_suffix("[]")
+                    .unwrap_or(path)
+                    .split('.')
+                    .all(|part| {
+                        !part.is_empty()
+                            && part.bytes().all(|byte| {
+                                byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'@')
+                            })
+                    });
+                if !valid_path || label.trim().is_empty() {
+                    report(
+                        &mut self.diagnostics,
+                        &at.child("hover_localisation").child(path),
+                        DiagnosticCode::Parse,
+                        Severity::Error,
+                        "expected an exact field path with an optional trailing `[]` and a non-empty label"
+                            .to_owned(),
+                    );
+                }
+            }
             for subtype_name in spec.subtypes.keys() {
                 self.forbid_params(
                     &at.child("subtypes").child(subtype_name),

@@ -568,6 +568,20 @@ pub struct TypeInfo {
     pub builtin: Box<[Symbol]>,
     /// Traits implemented for every instance of this type.
     pub trait_impls: Vec<TraitImpl>,
+    /// Explicit localisation fields eligible for the definition's hover table.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hover_localisation: Vec<HoverLocalisationField>,
+}
+
+/// An exact, case-insensitive path to an explicit localisation field.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct HoverLocalisationField {
+    /// Property names relative to the declaring definition's body.
+    pub path: Box<[Symbol]>,
+    /// Label rendered in the hover table.
+    pub label: Symbol,
+    /// Whether to select direct bare list items instead of a scalar value.
+    pub list: bool,
 }
 
 /// The conflict behaviour of a symbol type.
