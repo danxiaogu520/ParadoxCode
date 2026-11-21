@@ -53,6 +53,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - EU4 government power thresholds and gains scaled by parliament seats accept fractional values
   such as `0.01`.
 
+- Workspace-wide diagnostics for closed files start as soon as the language server is ready.
+
 ## [0.5.6] - 2026-11-17
 
 ### Removed
