@@ -69,8 +69,7 @@ Loading another page requires the same workspace and query snapshot. Edits refre
 cancelled requests cannot overwrite newer input. Coverage notices identify unavailable source
 files, text budgets, and output limits. Such results are partial, including when no available
 file matches. Cached semantic definitions do not imply that full localisation values or file
-contents are available. This implementation is undergoing the full
-[search acceptance matrix](../../SEARCH-PROPOSAL.md#验收矩阵).
+contents are available.
 
 ## Mission Preview
 
