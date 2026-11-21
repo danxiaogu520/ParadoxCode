@@ -336,6 +336,15 @@ pub(crate) fn localisation_preview(
     {
         return Some((preview.language.clone(), preview.value.clone()));
     }
+    let (language, value) = localisation_text_from_source(snapshot, definition)?;
+    Some((language, truncate_localisation_preview(&value)))
+}
+
+/// Full text for an explicitly opened preview, including unsaved localisations.
+pub(crate) fn localisation_text_from_source(
+    snapshot: &AnalysisSnapshot,
+    definition: &ResolutionDefinition,
+) -> Option<(Option<String>, String)> {
     let input = definition
         .location
         .document
@@ -345,7 +354,7 @@ pub(crate) fn localisation_preview(
             definition
                 .location
                 .file
-                .and_then(|file| input_for_source_file(snapshot, file))
+                .and_then(|file| crate::support::syntax_input_for_source_file(snapshot, file))
         })?;
     let ParsedContent::Text(parsed) = &input.parsed;
     let entry = find_cst_node(
@@ -366,7 +375,7 @@ pub(crate) fn localisation_preview(
         .unwrap_or(raw);
     // Mirror the engine preview derivation: transcoded (escaped) values decode to
     // the readable text the game renders; readable values pass through unchanged.
-    let value = truncate_localisation_preview(&transcode::decode_value(value));
+    let value = transcode::decode_value(value);
     if value.is_empty() {
         return None;
     }

@@ -345,6 +345,89 @@ suite('ParadoxCode VS Code extension host', () => {
     assert.deepEqual(fs.readFileSync(rawCopy), readable);
   });
 
+  test('text hovers open event previews and locate cross-file mission prerequisites on demand', async function () {
+    this.timeout(90_000);
+    if (!process.env.PDC_COMPLETION_SERVER) { this.skip(); return; }
+    const root = process.env.PDCLOC_HOST_WORKSPACE;
+    const client = await require('../../out/serverClient.js').acquireServerClient(30_000);
+    const { MissionPreviewPanel } = require('../../out/previewPanel.js');
+    const make = async (relative, text) => {
+      const file = path.join(root, relative);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, text);
+      return vscode.workspace.openTextDocument(vscode.Uri.file(file));
+    };
+    const source = await make('events/action_preview.txt', 'country_event = {\n id = preview_host.1\n title = host_preview_title\n desc = { trigger = { always = yes } text = host_preview_desc }\n option = { name = host_preview_ok }\n}\n');
+    const loc = await make('localisation/host_preview_l_english.yml', '\uFEFFl_english:\n host_preview_title:0 "Title One"\n host_preview_ok:0 "OK"\n');
+    const caller = await make('events/call_preview.txt', 'country_event = { id = preview_host.2 immediate = { country_event = { id = preview_host.1 } } }\n');
+    const upstream = await make('missions/action_target.txt', 'host_tree = { slot = 2 host_upstream = { position = 1 } }\n');
+    const missions = await make('missions/action_ref.txt', 'ref_tree = { slot = 1 host_dependent = { position = 1 required_missions = { host_upstream } } }\n');
+    const gfx = await make('interface/host_preview.gfx', 'spriteTypes = { spriteType = { name = "GFX_host_preview" texturefile = "gfx/interface/host.dds" } }\n');
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const wait = async predicate => {
+      const deadline = Date.now() + 15000;
+      while (!predicate() && Date.now() < deadline) await delay(50);
+      assert.ok(predicate(), JSON.stringify({ calls, pages: pages.map(p => p?.title), layouts,
+        ready: !MissionPreviewPanel.waitingForRenderer, tab: MissionPreviewPanel.panel?.visible, target: MissionPreviewPanel.target }));
+    };
+    const calls = [];
+    const pages = [];
+    const layouts = [];
+    const send = client.sendRequest;
+    const post = MissionPreviewPanel.post;
+    client.sendRequest = function (type, ...args) {
+      const method = typeof type === 'string' ? type : type.method;
+      if (['pdc/eventPreview', 'pdc/hoverCard', 'pdc/missionPreview'].includes(method)) calls.push(method);
+      const task = send.call(this, type, ...args);
+      if (method === 'pdc/eventPreview') task.then(r => pages.push(r?.card?.event), e => pages.push({ error: String(e) }));
+      return task;
+    };
+    MissionPreviewPanel.post = function (panel, msg) {
+      if (msg.type === 'preview' && msg.focusMission !== undefined) layouts.push(msg.payload.nodes[msg.focusMission].id);
+      if (msg.type === 'error' || msg.type === 'empty') layouts.push(msg.message);
+      return post.call(this, panel, msg);
+    };
+    const hoverAt = async (doc, word) => {
+      await vscode.window.showTextDocument(doc);
+      const pos = doc.positionAt(doc.getText().lastIndexOf(word) + 1);
+      const hovers = await vscode.commands.executeCommand('vscode.executeHoverProvider', doc.uri, pos);
+      return hovers.flatMap(h => h.contents).map(c => c.value || '');
+    };
+    const action = (parts, command) => {
+      const text = parts.find(p => p.includes('command:' + command + '?'));
+      assert.ok(text, 'missing action ' + command + ' in ' + parts.join(' '));
+      return JSON.parse(decodeURIComponent(text.match(/\?([^)]+)\)/)[1]))[0];
+    };
+    try {
+      await hoverAt(source, 'always');
+      assert.deepEqual(calls, []);
+      const eventHover = await hoverAt(caller, 'preview_host.1');
+      const event = action(eventHover, 'paradoxcode.previewEvent');
+      assert.equal(event.title, 'Title One', JSON.stringify(eventHover));
+      assert.ok(eventHover.some(text => text.replaceAll('&nbsp;', ' ').includes('Title One')), JSON.stringify(eventHover));
+      assert.equal(vscode.Uri.parse(event.location.uri).fsPath, source.uri.fsPath);
+      const m = action(await hoverAt(missions, 'host_upstream'), 'paradoxcode.locateMission');
+      assert.equal(vscode.Uri.parse(m.location.uri).fsPath, upstream.uri.fsPath);
+      assert.deepEqual(calls, [], 'ordinary and action hovers must not request cards');
+      await vscode.commands.executeCommand('paradoxcode.previewEvent', event);
+      await wait(() => pages.some(p => p?.id === event.id && p.conditionalDesc && p.title?.value === 'Title One'));
+      const edit = new vscode.WorkspaceEdit();
+      const start = loc.positionAt(loc.getText().indexOf('Title One'));
+      edit.replace(loc.uri, new vscode.Range(start, start.translate(0, 9)), 'Title Two');
+      assert.ok(await vscode.workspace.applyEdit(edit));
+      await wait(() => pages.some(p => p?.title?.value === 'Title Two'));
+      await vscode.commands.executeCommand('paradoxcode.locateMission', m);
+      await wait(() => layouts.includes('host_upstream'));
+      await hoverAt(gfx, 'GFX_host_preview');
+      assert.ok(calls.includes('pdc/hoverCard'), 'direct sprite hovers retain texture lookup');
+    } finally {
+      client.sendRequest = send;
+      MissionPreviewPanel.post = post;
+      MissionPreviewPanel.dispose();
+      if (loc.isDirty) await loc.save();
+    }
+  });
+
   test('replays completion through the editor after Unicode and CRLF edits', async function () {
     this.timeout(120_000);
     const server = process.env.PDC_COMPLETION_SERVER;

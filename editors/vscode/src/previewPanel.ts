@@ -5,6 +5,7 @@ import { LanguageClient } from 'vscode-languageclient/node';
 import { FRAME_SPRITE, FontAssets, GameAssetStore, findChineseFontMod, findGameDirectory } from './gameAssets';
 import { realUriOf } from './transparentLoc';
 import { missionPreviewStrings, webviewI18nMessage } from './webviewI18n';
+import type { PreviewTarget } from './eventPreviewPanel';
 
 const PREVIEW_VIEW_TYPE = 'paradoxcode.missionPreview';
 
@@ -76,7 +77,7 @@ export interface SourceRange {
 
 /** Webview messages sent to the renderer. */
 type OutboundMessage =
-    | { type: 'preview'; payload: MissionPreview }
+    | { type: 'preview'; payload: MissionPreview; focusMission?: number }
     | { type: 'empty'; message: string }
     | { type: 'error'; message: string }
     /** Localised UI strings; always the first message so no data paint beats it. */
@@ -94,6 +95,7 @@ type OutboundMessage =
 
 /** Webview messages received from the renderer. */
 type InboundMessage =
+    | { type: 'ready' }
     | { type: 'jump'; uri: string; range: SourceRange | null }
     | { type: 'openGroup'; uri: string; range: SourceRange | null };
 
@@ -140,6 +142,9 @@ export class MissionPreviewPanel {
     private static requestSequence = 0;
     private static previewUri: string | undefined;
     private static previewVersion: number | undefined;
+    private static target: PreviewTarget | undefined;
+    private static focusPending = false;
+    private static waitingForRenderer = false;
     private static pendingRequest: vscode.CancellationTokenSource | undefined;
 
     /** Closes the preview panel (extension deactivation). */
@@ -154,7 +159,9 @@ export class MissionPreviewPanel {
         MissionPreviewPanel.previewVersion = undefined;
     }
 
-    public static show(extensionUri: vscode.Uri, client?: LanguageClient): void {
+    public static show(extensionUri: vscode.Uri, client?: LanguageClient, target?: PreviewTarget): void {
+        MissionPreviewPanel.target = target;
+        MissionPreviewPanel.focusPending = !!target;
         if (MissionPreviewPanel.panel) {
             MissionPreviewPanel.panel.reveal(vscode.ViewColumn.Beside, true);
             void MissionPreviewPanel.refresh(client);
@@ -177,12 +184,7 @@ export class MissionPreviewPanel {
         // column next to the source editor and keep focus on the editor.
         panel.reveal(vscode.ViewColumn.Beside, true);
         MissionPreviewPanel.panel = panel;
-        panel.webview.html = MissionPreviewPanel.html(panel.webview, extensionUri);
-        MissionPreviewPanel.post(
-            panel,
-            webviewI18nMessage(missionPreviewStrings()),
-        );
-        MissionPreviewPanel.postOptions(panel);
+        MissionPreviewPanel.waitingForRenderer = true;
         panel.onDidDispose(() => {
             if (MissionPreviewPanel.panel === panel) {
                 MissionPreviewPanel.pendingRequest?.cancel();
@@ -193,6 +195,11 @@ export class MissionPreviewPanel {
 
         panel.webview.onDidReceiveMessage((message: InboundMessage) => {
             switch (message.type) {
+                case 'ready':
+                    MissionPreviewPanel.waitingForRenderer = false;
+                    MissionPreviewPanel.post(panel, webviewI18nMessage(missionPreviewStrings()));
+                    void MissionPreviewPanel.refresh(client);
+                    return;
                 case 'jump':
                 case 'openGroup':
                     void MissionPreviewPanel.jump(message.uri, message.range);
@@ -200,14 +207,14 @@ export class MissionPreviewPanel {
             }
         });
 
-        void MissionPreviewPanel.refresh(client);
+        panel.webview.html = MissionPreviewPanel.html(panel.webview, extensionUri);
     }
 
     /** Fetches the mission layout for the active EU4 document from pdc and
      * pushes it to the webview. No-ops when the panel is closed. */
     public static async refresh(client?: LanguageClient): Promise<void> {
         const panel = MissionPreviewPanel.panel;
-        if (!panel) {
+        if (!panel || MissionPreviewPanel.waitingForRenderer) {
             return;
         }
         MissionPreviewPanel.postOptions(panel);
@@ -227,9 +234,10 @@ export class MissionPreviewPanel {
                   (document) =>
                       document.uri.toString() === MissionPreviewPanel.previewUri,
               );
-        const editor = active !== undefined && isPreviewDocument(active)
-            ? active
-            : pinned ?? active;
+        const requested = MissionPreviewPanel.focusPending && MissionPreviewPanel.target
+            ? vscode.workspace.textDocuments.find(doc => doc.uri.toString() === MissionPreviewPanel.target?.location.uri)
+            : undefined;
+        const editor = requested ?? (active !== undefined && isPreviewDocument(active) ? active : pinned ?? active);
         if (!editor || !isPreviewDocument(editor)) {
             MissionPreviewPanel.post(panel, {
                 type: 'empty',
@@ -245,7 +253,11 @@ export class MissionPreviewPanel {
         }
         const documentUri = editor.uri.toString();
         const documentVersion = editor.version;
-        const logical = logicalPath(editor);
+        if (MissionPreviewPanel.target && MissionPreviewPanel.target.location.uri !== documentUri) {
+            MissionPreviewPanel.target = undefined;
+            MissionPreviewPanel.focusPending = false;
+        }
+        const logical = logicalPath(editor) ?? MissionPreviewPanel.target?.path;
         if (!logical) {
             MissionPreviewPanel.post(panel, {
                 type: 'error',
@@ -286,7 +298,18 @@ export class MissionPreviewPanel {
             }
             MissionPreviewPanel.previewUri = documentUri;
             MissionPreviewPanel.previewVersion = documentVersion;
-            MissionPreviewPanel.post(panel, { type: 'preview', payload });
+            let focusMission: number | undefined;
+            const target = MissionPreviewPanel.target;
+            if (MissionPreviewPanel.focusPending && target) {
+                const matches = payload.nodes.filter(n => n.id.toLowerCase() === target.id.toLowerCase());
+                const pos = target.location.range.start;
+                const match = matches.length === 1 ? matches[0] : matches.find(n =>
+                    n.sourceRange?.start.line === pos.line && n.sourceRange.start.character === pos.character);
+                if (match) focusMission = payload.nodes.indexOf(match);
+                else void vscode.window.showInformationMessage(vscode.l10n.t('Mission {0} is no longer at this location.', target.id));
+                MissionPreviewPanel.focusPending = false;
+            }
+            MissionPreviewPanel.post(panel, { type: 'preview', payload, focusMission });
             void MissionPreviewPanel.postAssets(panel, payload);
         } catch (error) {
             if (cancellation.token.isCancellationRequested || requestId !== MissionPreviewPanel.requestSequence || panel !== MissionPreviewPanel.panel) {

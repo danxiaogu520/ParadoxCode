@@ -166,18 +166,57 @@ pub fn hover_with_cancellation(
     // the declaration still describes its owning type and all its bindings.
     if let Some(definition) = semantic.definitions.iter().find(|definition| {
         definition.document.as_ref() == Some(document)
-            && contains(definition.symbol.selection_range, position)
+            && (contains(definition.symbol.selection_range, position)
+                || (definition.kind == "event"
+                    && definition.symbol.location.range.start() == range.start()))
     }) {
-        return Ok(Some(
-            symbol::hover_for_symbol(
-                snapshot,
-                &definition.kind,
-                &definition.name,
-                range,
-                cancellation,
-            )?
-            .into_hover_with_range(range),
-        ));
+        let mut model = symbol::hover_for_symbol(
+            snapshot,
+            &definition.kind,
+            &definition.name,
+            range,
+            cancellation,
+        )?;
+        if matches!(definition.kind.as_str(), "event" | "mission") {
+            let location =
+                crate::support::local_location(&input, definition.symbol.selection_range);
+            let title = model
+                .preview
+                .take()
+                .filter(|target| target.location == location)
+                .and_then(|target| target.title);
+            model.preview = Some(crate::PreviewTarget {
+                title,
+                kind: definition.kind.clone(),
+                id: definition.name.clone(),
+                location,
+            });
+        }
+        return Ok(Some(model.into_hover_with_range(range)));
+    }
+    // Bare prerequisite list members may have no semantic reference. Use the
+    // already lowered list ranges so hovering a mission file never reparses it.
+    if let Some(spec) = input.profile.mission_view.as_ref()
+        && crate::mission::is_mission_path(&input.profile, input.path.as_ref())
+        && let Some(hir) = input.hir.as_deref()
+        && hir.properties().iter().any(|p| {
+            p.key == spec.node_fields.required_missions
+                && p.path.len() == 3
+                && p.value_range.is_some_and(|r| contains(r, position))
+        })
+        && let Some(member) = hir
+            .bare_values()
+            .iter()
+            .find(|v| contains(v.range, position))
+    {
+        let model = symbol::hover_for_symbol(
+            snapshot,
+            &spec.symbol_kind,
+            &member.value,
+            member.range,
+            cancellation,
+        )?;
+        return Ok(Some(model.into_hover_with_range(member.range)));
     }
     let mut references = semantic.references.iter().filter(|reference| {
         reference.document.as_ref() == Some(document) && contains(reference.range, position)

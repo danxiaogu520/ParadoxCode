@@ -174,7 +174,7 @@ pub fn data() -> serde_json::Value {
   ],
   "markers": {
     "src/previewPanel.ts": [
-      "show(extensionUri: vscode.Uri, client?: LanguageClient)",
+      "focusMission",
       "version: documentVersion",
       "sourceRange",
       "requestSequence"

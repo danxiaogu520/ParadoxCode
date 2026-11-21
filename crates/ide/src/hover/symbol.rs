@@ -44,6 +44,14 @@ pub(crate) fn hover_for_symbol(
             .collect::<Vec<_>>();
         if active.len() == 1 {
             let definition = active[0];
+            if matches!(kind, "event" | "mission") {
+                model.preview = Some(crate::PreviewTarget {
+                    title: None,
+                    kind: kind.to_owned(),
+                    id: name.to_owned(),
+                    location: crate::resolution::definition_selection_location(definition),
+                });
+            }
             model.push_section(format!(
                 "#### Resolved definition\n\n- Source root: {}\n- Defined in: `{}`",
                 symbol_source_root(snapshot, &definition.location),
@@ -73,6 +81,13 @@ pub(crate) fn hover_for_symbol(
             let previews =
                 symbol_localisation_preview(snapshot, kind, name, definition, cancellation)?;
             if !previews.is_empty() {
+                if let Some(target) = model.preview.as_mut() {
+                    let field = if kind == "mission" { "name" } else { "title" };
+                    target.title = previews
+                        .iter()
+                        .find(|row| row.label.as_deref() == Some(field))
+                        .map(|row| row.value.clone());
+                }
                 model.has_localisation_preview = true;
                 model.push_section(localisation_preview_section(&previews));
             }

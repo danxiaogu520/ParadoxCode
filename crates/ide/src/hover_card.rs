@@ -99,6 +99,10 @@ pub struct HoverCardEventOption {
 /// Event facts a rendered event-window card needs beyond its assets.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HoverCardEvent {
+    /// Locations of the effective localisations used in an explicit preview.
+    pub sources: std::collections::BTreeMap<String, Location>,
+    /// Source of a conditional description that needs game state to evaluate.
+    pub conditional_desc: Option<Location>,
     pub id: String,
     /// `picture = <sprite>` spelling, when the event declares one.
     pub picture: Option<String>,
@@ -169,6 +173,23 @@ pub fn hover_card_with_cancellation(
     if let Some(card) = icon_card(snapshot, &input, position, cancellation)? {
         return Ok(Some(card));
     }
+    if let Some(card) = texture_card(snapshot, &input, position) {
+        return Ok(Some(card));
+    }
+    sprite_card(snapshot, &input, position, cancellation)
+}
+
+/// Resolve only a direct texture or sprite, without examining event or mission cards.
+pub fn texture_preview_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    position: TextSize,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverCard>, Cancelled> {
+    cancellation.checkpoint()?;
+    let Some(input) = input_for_document(snapshot, document) else {
+        return Ok(None);
+    };
     if let Some(card) = texture_card(snapshot, &input, position) {
         return Ok(Some(card));
     }
@@ -754,8 +775,39 @@ fn card_anchor_for_selection(input: &ParsedInput, selection: TextSize) -> Option
     by_range
 }
 
-/// The event-window card: a hovered cardable definition's block-name token
-/// (see [`card_anchor_at`]) renders that block as the in-game event window.
+/// Opens a pinned event by identity so edits above the event cannot retarget the preview.
+pub fn event_preview_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    id: &str,
+    cancellation: &CancellationToken,
+) -> Result<Option<HoverCard>, Cancelled> {
+    cancellation.checkpoint()?;
+    let Some(input) = input_for_document(snapshot, document) else {
+        return Ok(None);
+    };
+    let Some(hir) = input.hir.as_deref() else {
+        return Ok(None);
+    };
+    let mut definitions = hir
+        .definitions()
+        .iter()
+        .filter(|d| d.kind.as_ref() == "event" && d.name.eq_ignore_ascii_case(id));
+    let Some(definition) = definitions.next() else {
+        return Ok(None);
+    };
+    if definitions.next().is_some() {
+        return Ok(None);
+    }
+    let anchor = CardAnchor {
+        kind: &definition.kind,
+        name: Some(&definition.name),
+        name_field: None,
+        block_range: definition.range,
+    };
+    event_card_for_anchor(snapshot, &input, anchor, cancellation, true)
+}
+
 fn event_card(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
@@ -769,7 +821,7 @@ fn event_card(
     let Some(anchor) = card_anchor_at(input, position) else {
         return Ok(None);
     };
-    event_card_for_anchor(snapshot, input, anchor, cancellation)
+    event_card_for_anchor(snapshot, input, anchor, cancellation, false)
 }
 
 /// Renders the event card for a reference's target: the cardable block the
@@ -786,7 +838,7 @@ fn event_card_for_reference(
     let Some(anchor) = card_anchor_for_selection(target, selection.start()) else {
         return Ok(None);
     };
-    event_card_for_anchor(snapshot, target, anchor, cancellation)
+    event_card_for_anchor(snapshot, target, anchor, cancellation, false)
 }
 
 /// Renders one anchored definition as the event window. Field semantics are
@@ -800,6 +852,7 @@ fn event_card_for_anchor(
     input: &ParsedInput,
     anchor: CardAnchor<'_>,
     cancellation: &CancellationToken,
+    full_text: bool,
 ) -> Result<Option<HoverCard>, Cancelled> {
     if !anchor.kind.eq_ignore_ascii_case("event") {
         return Ok(None);
@@ -930,9 +983,45 @@ fn event_card_for_anchor(
     keys.sort();
     keys.dedup();
     let lookup_keys: Vec<&str> = keys.iter().map(String::as_str).collect();
-    let texts = localisation_values_by_key(snapshot, &lookup_keys, cancellation)?;
+    let mut sources = std::collections::BTreeMap::new();
+    let texts = if full_text {
+        let mut texts = std::collections::HashMap::new();
+        for key in lookup_keys {
+            let candidates =
+                symbol_candidates_for_hover(snapshot, "localisation", key, cancellation)?;
+            if let Some(definition) =
+                crate::resolution::effective_localisation_candidate(&candidates)
+                && let Some(pair) =
+                    crate::localisation::localisation_text_from_source(snapshot, definition)
+                        .or_else(|| crate::localisation::localisation_preview(snapshot, definition))
+                && crate::localisation::preview_language_is_target(
+                    pair.0.as_deref(),
+                    snapshot.localisation_preview_language(),
+                )
+            {
+                sources.insert(
+                    key.to_owned(),
+                    crate::resolution::definition_selection_location(definition),
+                );
+                texts.insert(key.to_owned(), pair);
+            }
+        }
+        texts
+    } else {
+        localisation_values_by_key(snapshot, &lookup_keys, cancellation)?
+    };
     let resolved = |key: &str| texts.get(key).cloned();
     let event = HoverCardEvent {
+        sources,
+        conditional_desc: properties
+            .iter()
+            .find(|p| {
+                p.key.eq_ignore_ascii_case("desc")
+                    && p.path.len() == 2
+                    && p.scalar.is_none()
+                    && within(anchor.block_range, p.range)
+            })
+            .map(|p| crate::support::local_location(input, p.key_range)),
         id: id.clone(),
         picture: picture.clone(),
         title_key: title_key.clone(),
@@ -981,7 +1070,7 @@ fn event_card_for_anchor(
         }
     };
     let background_top = chrome("background_top")?;
-    if picture_asset.is_none() && background_top.is_none() {
+    if !full_text && picture_asset.is_none() && background_top.is_none() {
         return Ok(None);
     }
     let event_assets = EventCardAssets {
