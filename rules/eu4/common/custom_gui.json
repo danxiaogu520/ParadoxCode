@@ -144,7 +144,7 @@
       "fields": {
         "name": {
           "card": "1",
-          "doc": "Must match a scripted instantTextBoxType in a .gui file",
+          "doc": "Matches a scripted instantTextBoxType in a .gui file and supplies the localisation key for the text box content.",
           "value": "scalar"
         },
         "potential": {

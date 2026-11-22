@@ -509,8 +509,16 @@ fn ir_country_tag_hover_resolves_optional_name_and_adjective() {
     );
     let snapshot = host.snapshot();
     let result = hover(&snapshot, &id, 1).expect("country tag hover");
-    for row in ["| name | Test Republic |", "| adj | Republican |"] {
-        assert!(result.contents.contains(row), "{}", result.contents);
+    for (label, value) in [("name", "Test Republic"), ("adj", "Republican")] {
+        let link = format!("| [{label}](pdc-hover:");
+        assert!(
+            result
+                .contents
+                .lines()
+                .any(|row| { row.starts_with(&link) && row.ends_with(&format!("| {value} |")) }),
+            "{}",
+            result.contents
+        );
     }
     assert!(
         diagnostics(&snapshot, &id)
@@ -537,7 +545,9 @@ fn ir_hover_preserves_every_binding_label_for_identical_localisation_text() {
         assert!(
             result
                 .contents
-                .contains(&format!("| {label} | Region One |")),
+                .lines()
+                .any(|row| row.starts_with(&format!("| [{label}](pdc-hover:"))
+                    && row.ends_with("| Region One |")),
             "{}",
             result.contents
         );

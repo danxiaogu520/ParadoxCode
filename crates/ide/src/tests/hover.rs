@@ -36,7 +36,7 @@ fn semantic_hover_descends_into_quoted_script_with_mapped_range() {
 }
 
 #[test]
-fn symbol_hover_explains_active_and_shadowed_source_roots() {
+fn symbol_hover_links_only_the_effective_definition_at_the_bottom() {
     use engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;
 
@@ -84,14 +84,19 @@ fn symbol_hover_explains_active_and_shadowed_source_roots() {
         .expect("open reference");
     let position = u32::try_from(text.find("shared.1").expect("reference") + 1).expect("position");
     let hover = hover(&host.snapshot(), &id, position).expect("source hover");
-    assert!(hover.contents.contains("Project · [events/definitions.txt"));
     assert!(
         hover
             .contents
-            .contains("Overrides 1 lower-priority definition")
+            .lines()
+            .last()
+            .is_some_and(|line| line.starts_with("Defined in [events/definitions.txt]"))
     );
-    assert!(!hover.contents.contains("Vanilla"));
+    assert!(!hover.contents.contains("Overrides"));
+    assert!(!hover.contents.contains("Candidates"));
     assert_eq!(hover.links.len(), 1);
+    let snapshot = host.snapshot();
+    let file = hover.links[0].location.file.expect("definition file");
+    assert_eq!(snapshot.source_files()[&file].root_id, SourceRootId::new(2));
     fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -139,7 +144,7 @@ fn eu4_hover_shows_known_scope_registers_from_building_rules() {
     let hover = hover(&host.snapshot(), &id, pos).expect("building effect hover");
     assert!(
         hover.contents.contains(concat!(
-            "#### Scope at this position\n\n",
+            "#### Scope\n\n",
             "| Register | Scope |\n",
             "| --- | --- |\n",
             "| `ROOT` | `province` |\n",
@@ -525,8 +530,9 @@ fn localisation_hover_shows_the_resolved_short_text() {
     assert!(
         hover
             .contents
-            .contains("#### Localisation preview\n\n| Text |")
+            .contains("#### Localisation\n\n| Field | Text |")
     );
+    assert_eq!(hover.links[0].label, "Localisation");
     assert!(hover.contents.contains("| Foo |"));
 }
 
@@ -542,7 +548,7 @@ fn hover_prefers_nonempty_localisation_preview_over_empty_sibling() {
     host.open_document(
         localisation.clone(),
         1,
-        "l_english:\nmission_one_title:0 \"Mission One Title\"\nmission_one_desc:0 \"\"\n"
+        "l_english:\nmission_one_title:0 \"Mission One Title\"\nmission_one_desc:0 \"\"\nmission_reward_tip:0 \"Mission Reward Tooltip\"\n"
             .to_owned(),
         Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/localisation/test.yml",
@@ -550,7 +556,7 @@ fn hover_prefers_nonempty_localisation_preview_over_empty_sibling() {
     )
     .expect("open localisation");
     let mission = DocumentId::new("file:///tmp/missions/test.txt");
-    let source = "series = { mission_one = { potential = { always = yes } } }\n";
+    let source = "series = { mission_one = { trigger = { always = yes } effect = { custom_tooltip = mission_reward_tip } } }\n";
     host.open_document(
         mission.clone(),
         1,
@@ -570,6 +576,7 @@ fn hover_prefers_nonempty_localisation_preview_over_empty_sibling() {
         hover.contents
     );
     assert!(!hover.contents.contains("mission_one_desc"));
+    assert!(!hover.contents.contains("Mission Reward Tooltip"));
 }
 
 #[test]
@@ -852,14 +859,31 @@ fn typed_symbol_hover_shows_definition_localisation_preview() {
     host.open_document(
         localisation,
         1,
-        "l_english:\nevent_title:0 \"Event Title\"\n".to_owned(),
+        concat!(
+            "l_english:\n",
+            " event_title:0 \"Event Title\"\n",
+            " event_desc:0 \"Conditional Description\"\n",
+            " option_label:0 \"Option Label\"\n",
+            " option_tip:0 \"Option Effect Tooltip\"\n",
+            " condition_tip:0 \"Condition Tooltip\"\n",
+            " modifier_desc:0 \"Modifier Effect Description\"\n",
+        )
+        .to_owned(),
         Some(AbsPath::normalize(&std::path::PathBuf::from(
             "/tmp/localisation/test.yml",
         ))),
     )
     .expect("open localisation");
     let event = DocumentId::new("file:///tmp/events/test.txt");
-    let text = "country_event = { id = test.1 title = event_title }\n";
+    let text = concat!(
+        "country_event = {\n",
+        " id = test.1\n",
+        " title = \"event_title\"\n",
+        " desc = { desc = event_desc trigger = { custom_trigger_tooltip = { tooltip = condition_tip always = yes } } }\n",
+        " immediate = { add_country_modifier = { name = demo_modifier duration = 365 desc = modifier_desc } }\n",
+        " option = { name = option_label custom_tooltip = option_tip }\n",
+        "}\n",
+    );
     host.open_document(
         event.clone(),
         1,
@@ -883,11 +907,61 @@ fn typed_symbol_hover_shows_definition_localisation_preview() {
     .expect("open event use");
     let position =
         u32::try_from(use_text.find("test.1").expect("event reference") + 1).expect("position");
-    let result = hover(&host.snapshot(), &use_id, position).expect("event hover");
+    let snapshot = host.snapshot();
+    for (document, position) in [
+        (&use_id, position),
+        (
+            &event,
+            u32::try_from(text.find("test.1").expect("event ID")).expect("position"),
+        ),
+    ] {
+        let result = hover(&snapshot, document, position).expect("event hover");
+        for display in ["Event Title", "Conditional Description", "Option Label"] {
+            assert!(result.contents.contains(display), "{display}: {result:?}");
+        }
+        for script_text in [
+            "Option Effect Tooltip",
+            "Condition Tooltip",
+            "Modifier Effect Description",
+        ] {
+            assert!(!result.contents.contains(script_text), "{result:?}");
+        }
+    }
+    let tooltip = u32::try_from(text.find("option_tip").expect("tooltip key")).expect("position");
+    let result = hover(&snapshot, &event, tooltip).expect("tooltip key hover");
+    assert!(result.contents.contains("Option Effect Tooltip"));
+}
+
+#[test]
+fn nested_definition_localisation_belongs_to_the_nested_symbol() {
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
+    host.open_document(
+        DocumentId::new("file:///tmp/localisation/religion_hover.yml"),
+        1,
+        concat!(
+            "l_english:\n",
+            " group_crusade:0 \"Crusade Name\"\n",
+            " religion_reform:0 \"Religion Reform\"\n",
+        )
+        .to_owned(),
+        None,
+    )
+    .expect("open localisation");
+    let id = DocumentId::new("file:///tmp/common/religions/hover.txt");
+    let source = "demo_group = { crusade_name = group_crusade demo_religion = { reform_tooltip = religion_reform } }";
+    host.open_document(id.clone(), 1, source.to_owned(), None)
+        .expect("open religion definitions");
+    let snapshot = host.snapshot();
+
+    let group = hover(&snapshot, &id, 1).expect("group hover");
+    assert!(group.contents.contains("Crusade Name"), "{group:?}");
+    assert!(!group.contents.contains("Religion Reform"), "{group:?}");
+    let position =
+        u32::try_from(source.find("demo_religion").expect("religion") + 1).expect("position");
+    let religion = hover(&snapshot, &id, position).expect("religion hover");
     assert!(
-        result.contents.contains("| title | Event Title |"),
-        "typed symbol hover should include its definition's localisation: {}",
-        result.contents
+        religion.contents.contains("Religion Reform"),
+        "{religion:?}"
     );
 }
 
@@ -923,10 +997,211 @@ fn bound_kind_hover_shows_every_template_preview() {
         u32::try_from(source.find("region_two").expect("region name") + 1).expect("position");
     let result = hover(&host.snapshot(), &definition, position).expect("region hover");
     assert!(
-        result.contents.contains("| name | Region Two |")
-            && result.contents.contains("| short | Region 2 |"),
+        result.contents.contains("| [name](pdc-hover:")
+            && result.contents.contains("| Region Two |")
+            && result.contents.contains("| [short](pdc-hover:")
+            && result.contents.contains("| Region 2 |"),
         "every resolvable binding template should contribute a labelled preview row: {}",
         result.contents
+    );
+}
+
+#[test]
+fn definition_hover_previews_text_boxes_privilege_lists_and_ancestor_explanations() {
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
+    host.open_document(
+        DocumentId::new("file:///tmp/localisation/test.yml"),
+        1,
+        concat!(
+            "l_english:\n",
+            " demo_box:0 \"Text box body\"\n",
+            " demo_hint:0 \"Text box tip\"\n",
+            " demo_modifier:0 \"Privilege modifier\"\n",
+            " demo_extra:0 \"Privilege detail\"\n",
+            " demo_explanation:0 \"Ancestor explanation\"\n",
+        )
+        .to_owned(),
+        None,
+    )
+    .expect("open localisation");
+
+    for (path, source, marker, expected_labels, texts) in [
+        (
+            "custom_gui",
+            "custom_text_box = { name = demo_box tooltip = demo_hint }",
+            "demo_box",
+            &["name", "tooltip"][..],
+            &["Text box body", "Text box tip"][..],
+        ),
+        (
+            "estate_privileges",
+            "demo_privilege = { additional_description = { demo_modifier demo_extra no_matching_key } }",
+            "demo_privilege",
+            &["additional_description", "additional_description"],
+            &["Privilege modifier", "Privilege detail"],
+        ),
+        (
+            "ancestor_personalities",
+            "ancestor_demo_personality = { custom_ai_explanation = demo_explanation }",
+            "demo_personality",
+            &["custom_ai_explanation"],
+            &["Ancestor explanation"],
+        ),
+    ] {
+        let document = DocumentId::new(format!("file:///tmp/common/{path}/test.txt"));
+        host.open_document(document.clone(), 1, source.to_owned(), None)
+            .expect("open definition");
+        let position = u32::try_from(source.find(marker).expect("definition name") + 1).unwrap();
+        let hover = hover(&host.snapshot(), &document, position).expect("definition hover");
+        for (label, text) in expected_labels.iter().zip(texts) {
+            assert!(
+                hover.contents.lines().any(|line| {
+                    line.starts_with(&format!("| [{label}](pdc-hover:"))
+                        && line.ends_with(&format!("| {text} |"))
+                }),
+                "{hover:?}"
+            );
+        }
+        assert!(!hover.contents.contains("no_matching_key"), "{hover:?}");
+    }
+}
+
+#[test]
+fn generated_description_hover_prefers_primary_text_then_uses_fallback() {
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
+    host.open_document(
+        DocumentId::new("file:///tmp/localisation/test.yml"),
+        1,
+        concat!(
+            "l_english:\n",
+            " canonical_policy:0 \"Canonical policy\"\n",
+            " desc_canonical_policy:0 \"Primary description\"\n",
+            " canonical_policy_desc:0 \"Unused alternative description\"\n",
+            " alternate_policy:0 \"Alternate policy\"\n",
+            " desc_alternate_policy:0 \"\"\n",
+            " alternate_policy_desc:0 \"Fallback description\"\n",
+            " missing_policy:0 \"Missing policy\"\n",
+        )
+        .to_owned(),
+        None,
+    )
+    .expect("open localisation");
+    let document = DocumentId::new("file:///tmp/common/policies/test.txt");
+    let source = "canonical_policy = {} alternate_policy = {} missing_policy = {}";
+    host.open_document(document.clone(), 1, source.to_owned(), None)
+        .expect("open policies");
+    let snapshot = host.snapshot();
+
+    for (name, description) in [
+        ("canonical_policy", "Primary description"),
+        ("alternate_policy", "Fallback description"),
+        ("missing_policy", "Missing localisation"),
+    ] {
+        let position = u32::try_from(source.find(name).expect("policy name") + 1).unwrap();
+        let hover = hover(&snapshot, &document, position).expect("policy hover");
+        let desc = hover
+            .contents
+            .lines()
+            .filter(|line| line.starts_with("| [desc](") || line.starts_with("| desc |"))
+            .collect::<Vec<_>>();
+        assert_eq!(desc.len(), 1, "{hover:?}");
+        assert!(
+            desc[0].ends_with(&format!("| {description} |")),
+            "{hover:?}"
+        );
+        assert!(!hover.contents.contains("Unused alternative"), "{hover:?}");
+    }
+}
+
+#[test]
+fn government_name_hover_qualifies_each_title_and_keeps_all_field_groups() {
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
+    let document = DocumentId::new("file:///tmp/common/government_names/test.txt");
+    let mut source = String::from("demo_government = {");
+    let mut localisation = String::from("l_english:\n");
+    let fields = [
+        "rank",
+        "ruler_male",
+        "ruler_female",
+        "consort_male",
+        "consort_female",
+        "heir_male",
+        "heir_female",
+    ];
+    use std::fmt::Write as _;
+    for field in fields {
+        write!(source, " {field} = {{").unwrap();
+        for rank in 1..=3 {
+            write!(source, " {rank} = demo_{field}_{rank}").unwrap();
+            writeln!(localisation, " demo_{field}_{rank}:0 \"{field} {rank}\"").unwrap();
+        }
+        source.push_str(" }");
+    }
+    source.push_str(" }");
+    host.open_document(
+        DocumentId::new("file:///tmp/localisation/test.yml"),
+        1,
+        localisation,
+        None,
+    )
+    .expect("open localisation");
+    host.open_document(document.clone(), 1, source, None)
+        .expect("open government names");
+    let hover = hover(&host.snapshot(), &document, 1).expect("government name hover");
+    for field in fields {
+        for rank in 1..=3 {
+            assert!(
+                hover.contents.lines().any(|line| {
+                    line.starts_with(&format!("| [{field}.{rank}](pdc-hover:"))
+                        && line.ends_with(&format!("| {field} {rank} |"))
+                }),
+                "{hover:?}"
+            );
+        }
+    }
+    assert!(!hover.contents.contains("more fields"), "{hover:?}");
+}
+
+#[test]
+fn definition_without_a_localisation_binding_previews_an_existing_same_name_key() {
+    let mut host = eu4_host(game::eu4::runtime_rules().expect("first-party rules"));
+    let localisation = DocumentId::new("file:///tmp/localisation/unbound.yml");
+    host.open_document(
+        localisation.clone(),
+        1,
+        concat!(
+            "l_english:\n",
+            " grant_test_prestige:0 \"Grant Prestige\"\n",
+            " unrelated_tooltip:0 \"Only inside the effect\"\n",
+        )
+        .to_owned(),
+        None,
+    )
+    .expect("open localisation");
+    let effect = DocumentId::new("file:///tmp/common/scripted_effects/unbound.txt");
+    host.open_document(
+        effect.clone(),
+        1,
+        "grant_test_prestige = { add_prestige = 10 custom_tooltip = unrelated_tooltip }".to_owned(),
+        None,
+    )
+    .expect("open scripted effect");
+
+    let result = hover(&host.snapshot(), &effect, 1).expect("scripted effect hover");
+    assert!(
+        result
+            .contents
+            .contains("### scripted_effect `grant_test_prestige`")
+    );
+    assert!(result.contents.contains("| Grant Prestige |"));
+    assert!(!result.contents.contains("Only inside the effect"));
+    assert_eq!(
+        result.links[0].location.document.as_ref(),
+        Some(&localisation)
+    );
+    assert_eq!(
+        result.links.last().unwrap().location.document.as_ref(),
+        Some(&effect)
     );
 }
 
@@ -1326,6 +1601,7 @@ fn localisation_hover_shows_only_the_target_language() {
     let id = DocumentId::new("file:///tmp/localisation/parallel.yml");
     let text = concat!(
         "l_english:\n",
+        "shared_name:0 \"Earlier text\"\n",
         "shared_name:0 \"English text\"\n",
         "l_french:\n",
         "shared_name:0 \"Texte français\"\n",
@@ -1339,10 +1615,31 @@ fn localisation_hover_shows_only_the_target_language() {
     let hover = hover(&host.snapshot(), &id, position).expect("localisation hover");
     assert!(
         hover.contents.contains("| English text |")
+            && !hover.contents.contains("Earlier text")
             && !hover.contents.contains("Texte français")
-            && !hover.contents.contains("Deutscher Text"),
+            && !hover.contents.contains("Deutscher Text")
+            && !hover.contents.contains("Language")
+            && !hover.contents.contains("Candidates")
+            && !hover.contents.contains("ambiguous"),
         "only the target language (english by default) renders: {}",
         hover.contents
+    );
+    let effective = u32::try_from(text.match_indices("shared_name").nth(1).unwrap().0)
+        .expect("effective localisation key offset");
+    assert_eq!(hover.links.len(), 2);
+    assert!(
+        hover
+            .links
+            .iter()
+            .all(|link| link.location.range.start() == effective)
+    );
+    assert!(
+        hover
+            .contents
+            .lines()
+            .last()
+            .unwrap()
+            .starts_with("Defined in ")
     );
 }
 
@@ -1476,7 +1773,7 @@ fn localisation_variable_fragment_hover_resolves_keys_and_names_placeholders() {
 }
 
 #[test]
-fn ambiguous_dynamic_set_candidates_carry_positions() {
+fn dynamic_set_hover_links_the_declaration_under_the_cursor() {
     let (host, id) = snapshot(concat!(
         "country_event = { id = p.1 immediate = { ",
         "set_variable = { which = my_stab_var value = 1 } ",
@@ -1492,12 +1789,9 @@ fn ambiguous_dynamic_set_candidates_carry_positions() {
         "variable values hover through the dynamic set: {}",
         hover.contents
     );
-    let first = hover.contents.match_indices("L1:C").count();
-    assert!(
-        first >= 2,
-        "ambiguous sites stay distinguishable by position: {}",
-        hover.contents
-    );
+    assert_eq!(hover.links.len(), 1);
+    assert_eq!(hover.links[0].location.range.start(), position - 1);
+    assert!(!hover.contents.contains("Candidates"));
 }
 
 #[test]
@@ -1612,7 +1906,7 @@ fn semantic_hover_infers_modifier_kind_from_workspace_membership() {
 }
 
 #[test]
-fn texturefile_value_hover_reports_resolution_provenance() {
+fn texturefile_value_hover_reports_resolution() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -1650,8 +1944,8 @@ fn texturefile_value_hover_reports_resolution_provenance() {
         "drift resolution notes the engine fallback: {drift_hover:?}"
     );
     assert!(
-        drift_hover.contents.contains("the project"),
-        "resolution names the providing root: {drift_hover:?}"
+        drift_hover.contents.contains("gfx/interface/health.dds"),
+        "resolution names the effective path: {drift_hover:?}"
     );
 
     let missing = u32::try_from(text.find("gone.dds").expect("missing value")).expect("offset");

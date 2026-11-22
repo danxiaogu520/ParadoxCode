@@ -628,6 +628,9 @@ pub struct Binding {
     pub strip_prefix: Option<Symbol>,
     /// Localisation-key template; `$` is the instance name.
     pub loc: Option<Symbol>,
+    /// Alternate localisation-key template for previews without primary text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview_fallback: Option<Symbol>,
     /// Sprite-name template; `$` is the instance name.
     pub sprite: Option<Symbol>,
     /// Whether the bound symbol must resolve.

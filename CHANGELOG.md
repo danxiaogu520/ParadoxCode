@@ -7,12 +7,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- EU4 definition hovers show linked localisation fields and text, with the
+  definition link at the bottom. Event previews and mission tree navigation open
+  from the hover. Localisation used by effects and triggers is kept with its
+  script references.
+
 ### Fixed
 
 - Report unknown localisation keys only when the workspace has no effective definition for them.
   Empty entries and definitions in other languages count as defined.
 - Resolve mission-tree titles using each entry's language header. Files with no language suffix
   and files with multiple language headers can supply titles for the selected preview language.
+- EU4 definition hovers preview scripted text box content, estate privilege
+  descriptions, ancestor personality explanations, and more generated
+  descriptions. Government name previews identify the rank and title fields.
 
 ### Security
 

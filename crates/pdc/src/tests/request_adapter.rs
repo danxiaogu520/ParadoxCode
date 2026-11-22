@@ -2056,9 +2056,15 @@ country_event = {\n\
     );
     let hover = card(10);
     let markdown = hover["contents"]["value"].as_str().unwrap();
-    assert!(markdown.contains(&format!("{loc_uri}#L3,2")), "{markdown}");
+    assert!(markdown.contains("| Field | Text |"), "{markdown}");
     assert!(
-        markdown.contains(&format!("{event_uri}#L3,7")),
+        markdown.contains(&format!("| [title]({loc_uri}#L3,2) | A title |")),
+        "{markdown}"
+    );
+    assert!(
+        markdown.ends_with(&format!(
+            "Defined in [events/test_events.txt]({event_uri}#L3,7)"
+        )),
         "{markdown}"
     );
     assert!(!markdown.contains("pdc-hover:"), "{markdown}");

@@ -31,6 +31,7 @@ One type implementation binding: a localisation-key or sprite-name template.
 | Field | Required | Source default | Shape | Meaning |
 | --- | --- | --- | --- | --- |
 | `loc` | no | `null` | `{"type":["string","null"]}` | Localisation-key template (`$` stands for the instance name). |
+| `preview_fallback` | no | — | `{"type":["string","null"]}` | Alternate localisation-key template for previews when `loc` has no text. |
 | `required` | no | `null` | `{"type":["boolean","null"]}` | Whether the bound symbol must resolve. |
 | `sprite` | no | `null` | `{"type":["string","null"]}` | Sprite-name template. |
 | `strip_prefix` | no | — | `{"type":["string","null"]}` | Remove this leading affix from the instance name before expanding the template. |

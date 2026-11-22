@@ -394,7 +394,7 @@
         "additional_description": {
           "card": "0..1",
           "doc": "You can put static modifier names here as well as normal localisation keys",
-          "list": "'cossacks_regiment' | 'rajput_regiment' | scalar"
+          "list": "ref<localisation> | scalar"
         },
         "ai_will_do": {
           "body": "estate_privilege_body__ai_will_do",
@@ -541,7 +541,7 @@
       }
     },
     "estate_privilege_body__additional_description": {
-      "items": "'cossacks_regiment' | 'rajput_regiment' | scalar"
+      "items": "ref<localisation> | scalar"
     },
     "estate_privilege_body__ai_will_do": {
       "fields": {

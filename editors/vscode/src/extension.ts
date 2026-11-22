@@ -18,7 +18,7 @@ import { LoadedFilesProvider } from './fileExplorer';
 import { localisationSync } from './localisationSync';
 import { SearchPanel } from './searchPanel';
 import { MissionPreviewPanel } from './previewPanel';
-import { EventPreviewPanel, parsePreviewTarget, type PreviewTarget } from './eventPreviewPanel';
+import { EventPreviewPanel, parsePreviewTarget } from './eventPreviewPanel';
 import { MissionIconPickerPanel } from './iconPickerPanel';
 import {
     PDCLOC_SCHEME,
@@ -35,6 +35,7 @@ import {
 import { normalizeTexturePath } from './gameAssets';
 import {
     appendTextureSection,
+    insertHoverSection,
     extractSpriteHoverName,
     markdownFromHoverContents,
     texturefileHoverMarkdown,
@@ -718,32 +719,13 @@ function clientMiddleware(getClient: () => LanguageClient): NonNullable<Language
             const target = parsePreviewTarget((result as (ProtocolHover & { pdcPreview?: unknown }) | null)?.pdcPreview);
             const config = vscode.workspace.getConfiguration('paradoxcode.hover', document.uri);
             if (target && hover) {
-                if (config.get(target.kind === 'event' ? 'eventCard' : 'missionCard', true)) {
+                if (markdown && config.get(target.kind === 'event' ? 'eventCard' : 'missionCard', true)) {
                     const command = target.kind === 'event' ? 'paradoxcode.previewEvent' : 'paradoxcode.locateMission';
                     const label = target.kind === 'event' ? vscode.l10n.t('Preview Event') : vscode.l10n.t('Locate in Mission Tree');
                     const args = encodeURIComponent(JSON.stringify([target])).replace(/[()]/g, c => '%' + c.charCodeAt(0).toString(16));
-                    const link = new vscode.MarkdownString(`[${label}](command:${command}?${args})`);
-                    link.isTrusted = { enabledCommands: [command] };
-                    const summary = new vscode.MarkdownString().appendText(target.id);
-                    if (target.eventType === 'country_event') summary.appendText(' · ' + vscode.l10n.t('Country event'));
-                    if (target.eventType === 'province_event') summary.appendText(' · ' + vscode.l10n.t('Province event'));
-                    for (const key of target.missingLocalisation?.slice(0, 6) ?? []) {
-                        summary.appendMarkdown('\n\n').appendText(vscode.l10n.t('Missing localisation ({0}): {1}', target.language ?? '', key));
-                    }
-                    for (const [id, ambiguous] of target.prerequisiteIssues?.slice(0, 8) ?? []) {
-                        summary.appendMarkdown('\n\n').appendText(ambiguous
-                            ? vscode.l10n.t('Ambiguous prerequisite: {0}', id)
-                            : vscode.l10n.t('Missing prerequisite: {0}', id));
-                    }
-                    if (target.title) summary.appendMarkdown('\n\n').appendText(target.title);
-                    if (target.titleSource) {
-                        summary.appendText(' · ');
-                        appendHoverSource(summary, target.titleSource.key, target.titleSource.location);
-                    }
-                    summary.appendMarkdown('\n\n');
-                    if (target.sourceName) summary.appendText(target.sourceName + ' · ');
-                    appendHoverSource(summary, target.path ?? path.basename(vscode.Uri.parse(target.location.uri).fsPath), target.location);
-                    return new vscode.Hover([summary, link], hover.range);
+                    markdown.value = insertHoverSection(markdown.value, `[${label}](command:${command}?${args})`);
+                    const enabledCommands = typeof markdown.isTrusted === 'object' ? markdown.isTrusted.enabledCommands : [];
+                    markdown.isTrusted = { enabledCommands: [...enabledCommands, command] };
                 }
                 return hover;
             }
@@ -781,12 +763,6 @@ function clientMiddleware(getClient: () => LanguageClient): NonNullable<Language
 }
 
 const OPEN_HOVER_LOCALISATION = 'paradoxcode.localisation.openHoverSource';
-
-function appendHoverSource(markdown: vscode.MarkdownString, label: string, location: PreviewTarget['location']): void {
-    const { line, character } = location.range.start;
-    const uri = navigationUri(vscode.Uri.parse(location.uri)).with({ fragment: `L${line + 1},${character + 1}` });
-    markdown.appendMarkdown('[').appendText(label).appendMarkdown(`](${hoverSourceUrl(markdown, uri)})`);
-}
 
 function hoverSourceUrl(markdown: vscode.MarkdownString, uri: vscode.Uri): string {
     if (uri.scheme === PDCLOC_SCHEME) {
@@ -868,8 +844,8 @@ function combineHoverMarkdown(
 ): vscode.Hover | null {
     const markdown = hover ? hoverMarkdownString(hover) : undefined;
     if (hover && markdown) {
-        const augmented = new vscode.MarkdownString(`${markdown.value}\n\n${section}`);
-        return new vscode.Hover(augmented, hover.range);
+        markdown.value = insertHoverSection(markdown.value, section);
+        return hover;
     }
     if (hover) {
         // A non-markdown server hover keeps its own shape untouched.
@@ -897,7 +873,6 @@ async function augmentHoverWithCard(
     const section = texturefileHoverMarkdown({
         name: asset.sprite ?? path.basename(asset.path),
         rel: asset.logicalPath ?? path.basename(asset.path),
-        origin: asset.sourceName ?? (asset.rootKind === 'project' ? 'Project' : asset.rootKind === 'dependency' ? 'Dependency' : 'Vanilla'),
         url: image.url,
         width: image.width,
     });
@@ -962,15 +937,13 @@ async function augmentHoverTexturePreview(
         if (!entry || !image) {
             return hover;
         }
-        const augmented = new vscode.MarkdownString(
-            appendTextureSection(markdown.value, {
-                name,
-                rel: entry.textureFile,
-                url: image.url,
-                width: image.width,
-            }),
-        );
-        return new vscode.Hover(augmented, hover.range);
+        markdown.value = appendTextureSection(markdown.value, {
+            name,
+            rel: entry.textureFile,
+            url: image.url,
+            width: image.width,
+        });
+        return hover;
     }
     return hover ?? null;
 }

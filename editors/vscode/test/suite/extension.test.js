@@ -394,9 +394,11 @@ suite('ParadoxCode VS Code extension host', () => {
       return hovers.flatMap(h => h.contents).map(c => c.value || '');
     };
     const action = (parts, command) => {
-      const text = parts.find(p => p.includes('command:' + command + '?'));
+      const prefix = 'command:' + command + '?';
+      const text = parts.find(p => p.includes(prefix));
       assert.ok(text, 'missing action ' + command + ' in ' + parts.join(' '));
-      return JSON.parse(decodeURIComponent(text.match(/\?([^)]+)\)/)[1]))[0];
+      const args = text.slice(text.indexOf(prefix) + prefix.length).split(')', 1)[0];
+      return JSON.parse(decodeURIComponent(args))[0];
     };
     try {
       await hoverAt(source, 'always');
@@ -404,9 +406,12 @@ suite('ParadoxCode VS Code extension host', () => {
       const eventHover = await hoverAt(caller, 'preview_host.1');
       const event = action(eventHover, 'paradoxcode.previewEvent');
       assert.equal(event.title, 'Title One', JSON.stringify(eventHover));
-      assert.equal(event.eventType, 'country_event');
-      assert.equal(event.titleSource.key, 'host_preview_title');
-      assert.deepEqual(event.missingLocalisation, ['host_preview_desc']);
+      const complete = eventHover.find(text => text.includes('command:paradoxcode.previewEvent?'));
+      assert.ok(complete.includes('| Field | Text |'));
+      assert.ok(complete.includes('[title](command:paradoxcode.localisation.openHoverSource?'));
+      assert.ok(complete.includes('| desc | Missing localisation |'));
+      assert.ok(!complete.includes('| Language |'));
+      assert.match(complete.trimEnd().split('\n').at(-1), /^Defined in \[events\/action_preview\.txt\]/);
       const titleLink = action(eventHover, 'paradoxcode.localisation.openHoverSource');
       assert.equal(vscode.Uri.parse(titleLink).fragment, 'L2,2');
       await vscode.commands.executeCommand('paradoxcode.localisation.openHoverSource', titleLink);
@@ -418,7 +423,9 @@ suite('ParadoxCode VS Code extension host', () => {
       await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
       assert.ok(eventHover.some(text => text.replaceAll('&nbsp;', ' ').includes('Title One')), JSON.stringify(eventHover));
       assert.equal(vscode.Uri.parse(event.location.uri).fsPath, source.uri.fsPath);
-      const m = action(await hoverAt(missions, 'host_upstream'), 'paradoxcode.locateMission');
+      const missionHover = await hoverAt(missions, 'host_upstream');
+      const m = action(missionHover, 'paradoxcode.locateMission');
+      assert.ok(missionHover.some(text => text.includes('command:paradoxcode.locateMission?') && text.includes('\n\nDefined in ')));
       assert.equal(vscode.Uri.parse(m.location.uri).fsPath, upstream.uri.fsPath);
       assert.deepEqual(calls, [], 'ordinary and action hovers must not request cards');
       await vscode.commands.executeCommand('paradoxcode.previewEvent', event);

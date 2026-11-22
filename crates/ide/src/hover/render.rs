@@ -16,6 +16,7 @@ pub(crate) struct HoverModel {
     pub(crate) sections: Vec<String>,
     pub(crate) has_localisation_preview: bool,
     pub(crate) coverage: hir::analysis::AnalysisCoverage,
+    definition: Option<String>,
     links: Vec<HoverLink>,
 }
 
@@ -27,6 +28,7 @@ impl HoverModel {
             sections: Vec::new(),
             has_localisation_preview: false,
             coverage: Default::default(),
+            definition: None,
             links: Vec::new(),
         }
     }
@@ -60,6 +62,11 @@ impl HoverModel {
         markdown
     }
 
+    pub(crate) fn set_definition(&mut self, label: &str, location: Location) {
+        let link = self.source_link(label, location);
+        self.definition = Some(format!("Defined in {link}"));
+    }
+
     pub(crate) fn push_localisation(
         &mut self,
         rows: &[crate::localisation::LocalisationPreviewRow],
@@ -78,6 +85,7 @@ impl HoverModel {
     pub(crate) fn render(&self) -> String {
         std::iter::once(self.title.as_str())
             .chain(self.sections.iter().map(String::as_str))
+            .chain(self.definition.as_deref())
             .collect::<Vec<_>>()
             .join("\n\n")
     }

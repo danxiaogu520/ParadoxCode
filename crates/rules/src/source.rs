@@ -493,6 +493,9 @@ pub struct BindingSpec {
     /// Localisation-key template (`$` stands for the instance name).
     #[serde(default)]
     pub loc: Option<String>,
+    /// Alternate localisation-key template for previews when `loc` has no text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview_fallback: Option<String>,
     /// Sprite-name template.
     #[serde(default)]
     pub sprite: Option<String>,

@@ -3,7 +3,7 @@
 use super::render::{HoverModel, code_span};
 use crate::support::{ParsedInput, contains};
 use crate::types::{CancellationToken, Cancelled};
-use engine::{AnalysisSnapshot, SourceRootKind};
+use engine::AnalysisSnapshot;
 use rules::ir::{FieldId, FieldValue, Matcher, MatcherId, RefTarget, RulesIr, ValueType};
 use std::collections::{BTreeMap, BTreeSet};
 use text::TextSize;
@@ -179,34 +179,18 @@ pub(crate) fn query_source_hover(
     }
 }
 
-/// Provenance for a `texture_path` value hover: the resolved absolute path,
-/// the source root serving it, and whether only the engine's extension
-/// fallback saved the reference.
+/// Shows the resolved game-relative path and any extension fallback.
 fn texture_resolution_section(snapshot: &AnalysisSnapshot, value: &str) -> String {
     match snapshot.resolve_texture_path(value) {
         Some(resolution) => {
-            let origin = match resolution.hit.root_kind {
-                SourceRootKind::Project => "the project",
-                SourceRootKind::Dependency => "a dependency mod",
-                SourceRootKind::Vanilla => "the game or a DLC pack",
-            };
-            let origin = snapshot
-                .source_roots()
-                .iter()
-                .find(|root| root.id == resolution.hit.root_id)
-                .and_then(|root| root.name.as_deref())
-                .map_or_else(
-                    || origin.to_owned(),
-                    |name| format!("dependency {}", code_span(name)),
-                );
             let path = code_span(&resolution.logical_path);
             if resolution.extension_fallback {
                 format!(
-                    "- resolved: {} → {path} (extension fallback) · {origin}",
+                    "- resolved: {} → {path} (extension fallback)",
                     code_span(value)
                 )
             } else {
-                format!("- resolved: {path} · {origin}")
+                format!("- resolved: {path}")
             }
         }
         None => "- resolved: not found in any mod, game, or DLC pack root".to_owned(),
@@ -499,7 +483,6 @@ fn ir_field_hover(
         let previews =
             crate::localisation::localisation_previews_for_name(snapshot, &key, cancellation)?;
         rows.extend(crate::localisation::preview_rows(
-            snapshot,
             label.map(str::to_owned),
             &key,
             &previews,
@@ -641,7 +624,7 @@ pub(crate) fn scope_section(
             .collect();
         let shortest = scopes.iter().map(|fact| fact.range.len()).min()?;
         scopes.retain(|fact| fact.range.len() == shortest);
-        "Scope at this position"
+        "Scope"
     } else {
         "Scope inside this block"
     };
