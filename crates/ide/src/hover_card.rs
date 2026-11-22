@@ -1000,7 +1000,7 @@ fn event_card_for_anchor(
                 && let Some(pair) =
                     crate::localisation::localisation_text_from_source(snapshot, definition)
                         .or_else(|| crate::localisation::localisation_preview(snapshot, definition))
-                && crate::localisation::preview_language_is_target(
+                && vfs::preview_language_is_target(
                     pair.0.as_deref(),
                     snapshot.localisation_preview_language(),
                 )

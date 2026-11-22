@@ -592,6 +592,18 @@ pub struct LocalisationPreview {
     pub value: String,
 }
 
+/// Tests whether an entry's language header matches the requested preview language.
+/// Entries without a language header can be shown in any language.
+#[must_use]
+pub fn preview_language_is_target(language: Option<&str>, target: &str) -> bool {
+    language.is_none_or(|language| {
+        language
+            .strip_prefix("l_")
+            .unwrap_or(language)
+            .eq_ignore_ascii_case(target)
+    })
+}
+
 /// Bounds previews against pathological entries while covering the longest
 /// vanilla event and description texts in full.
 const MAX_LOCALISATION_PREVIEW_CHARS: usize = 1000;

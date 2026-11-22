@@ -1,4 +1,4 @@
-// case: localisation_language_gate
+// case: localisation_definitions
 // input:
 //   golden_lang_tree = {
 //   	slot = 1
@@ -12,5 +12,4 @@
 //   }
 //   
 diagnostics:
-- code=UnknownLocalisationKey severity=Warning certainty=certain range=62..74
-  message: localisation key `mission_lang_desc` is missing in english (defined in french)
+  (none)

@@ -316,7 +316,6 @@ impl AnalysisHost {
             self.scanned_localisation_previews =
                 Arc::new(Self::collect_scanned_localisation_previews(
                     &self.file_states,
-                    &self.source_files,
                     &self.preferred_localisation_languages,
                 ));
             self.rebuild_serving_localisation_previews();
@@ -713,13 +712,9 @@ impl AnalysisHost {
                     file.logical_path.as_str()
                 )));
             }
-            // Preview retention runs before `cache_files` is moved into `files` so the filter
-            // can resolve each preview's file path.
-            Self::retain_preferred_localisation_previews(
-                &mut cache_previews,
-                &cache_files,
+            cache_previews.retain_language(crate::snapshot::localisation_preview_target_language(
                 &self.preferred_localisation_languages,
-            );
+            ));
             for (id, file) in cache_files {
                 let current_path = file.physical_path.clone();
                 if let Some(previous) = files.insert(id, file) {
@@ -800,72 +795,16 @@ impl AnalysisHost {
         Ok(())
     }
 
-    /// Bounds resident memory for cache-installed localisation previews to the
-    /// single target language: the first configured preference, with English as
-    /// the default when none is configured. Cached Vanilla locates every key
-    /// once per language, so the other languages hold the bulk of preview bytes
-    /// while no query can reach them. Dropped previews stay in the persistent
-    /// `.pdcindex` and return on the next session that targets them;
-    /// diagnostics never read previews. Files without a path language marker
-    /// are always retained, as are files unknown to this cache's source table
-    /// (load-time validation guarantees the latter cannot occur).
-    fn retain_preferred_localisation_previews(
-        previews: &mut LocalisationPreviewMap,
-        files: &BTreeMap<SourceFileId, SourceFile>,
-        preferred: &[String],
-    ) {
-        let target = crate::snapshot::localisation_preview_target_language(preferred);
-        previews.retain_files(|file_id| {
-            files.get(&file_id).is_none_or(|file| {
-                Self::localisation_path_language(file.logical_path.as_str())
-                    .is_none_or(|language| language.eq_ignore_ascii_case(target))
-            })
-        });
-    }
-
-    /// Extracts the localisation language from a logical path. `localisation/l_english/…`
-    /// directories and `localisation/name_l_english.yml` file stems both yield `english`;
-    /// paths without a language marker yield `None`. Mirrors `ide`'s
-    /// `localisation_language` so retention covers exactly the candidates analysis selects.
-    fn localisation_path_language(path: &str) -> Option<&str> {
-        for segment in path.split('/') {
-            if let Some(language) = segment
-                .strip_prefix("l_")
-                .filter(|language| !language.is_empty())
-            {
-                let language = language
-                    .strip_suffix(".yml")
-                    .or_else(|| language.strip_suffix(".yaml"))
-                    .unwrap_or(language);
-                return (!language.is_empty()).then_some(language);
-            }
-        }
-        let file = path.rsplit('/').next()?;
-        let after = file
-            .rfind("_l_")
-            .map(|index| &file[index + 3..])
-            .unwrap_or_default();
-        let language = after
-            .strip_suffix(".yml")
-            .or_else(|| after.strip_suffix(".yaml"))
-            .unwrap_or(after);
-        (!language.is_empty()).then_some(language)
-    }
-
-    /// Assembles the scanned preview set from file states. States built by the
-    /// scan pipeline already carry preferred-rendering previews (see
-    /// `FileState::cache_only`); this only groups them by file and applies the
-    /// same preferred-language retention as cache installation.
+    /// Assembles the target language's previews from the scanned file states.
     fn collect_scanned_localisation_previews(
         file_states: &BTreeMap<SourceFileId, Arc<FileState>>,
-        files: &BTreeMap<SourceFileId, SourceFile>,
         preferred: &[String],
     ) -> LocalisationPreviewMap {
         let mut previews = LocalisationPreviewMap::new();
         for (file_id, state) in file_states {
             previews.replace_file_shared(
                 *file_id,
-                Self::scanned_entries_handle_for_state(state, files.get(file_id), preferred),
+                Self::scanned_entries_handle_for_state(state, preferred),
             );
         }
         previews
@@ -877,27 +816,18 @@ impl AnalysisHost {
     /// frontend; `None` when filtered out.
     fn scanned_entries_handle_for_state(
         state: &FileState,
-        file: Option<&SourceFile>,
         preferred: &[String],
     ) -> Option<Arc<Vec<(TextRange, LocalisationPreview)>>> {
         let target = crate::snapshot::localisation_preview_target_language(preferred);
-        let retained = file.is_none_or(|file| {
-            Self::localisation_path_language(file.logical_path.as_str())
-                .is_none_or(|language| language.eq_ignore_ascii_case(target))
-        });
-        if !retained {
-            return None;
-        }
-        if let Some(cached) = state.cached_localisation_previews.as_ref() {
-            return Some(Arc::clone(cached));
-        }
-        match state.parsed() {
-            Some(index::ParsedSource::Text(parsed)) => {
-                let entries = localisation_previews_from_parsed(parsed);
-                (!entries.is_empty()).then(|| Arc::new(entries))
+        let mut entries = match (state.cached_localisation_previews.as_ref(), state.parsed()) {
+            (Some(cached), _) => Arc::clone(cached),
+            (None, Some(index::ParsedSource::Text(parsed))) => {
+                Arc::new(localisation_previews_from_parsed(parsed))
             }
-            None => None,
-        }
+            (None, None) => return None,
+        };
+        LocalisationPreviewMap::retain_file_language(&mut entries, target);
+        (!entries.is_empty()).then_some(entries)
     }
 
     /// Rebuilds the serving preview map from the installed and scanned sets,
@@ -1188,7 +1118,6 @@ impl AnalysisHost {
         self.file_states = Arc::new(file_states);
         self.scanned_localisation_previews = Arc::new(Self::collect_scanned_localisation_previews(
             &self.file_states,
-            &self.source_files,
             &self.preferred_localisation_languages,
         ));
         self.rebuild_serving_localisation_previews();
@@ -1477,7 +1406,6 @@ impl AnalysisHost {
                     let entries = self.file_states.get(id).and_then(|state| {
                         Self::scanned_entries_handle_for_state(
                             state,
-                            self.source_files.get(id),
                             &self.preferred_localisation_languages,
                         )
                     });

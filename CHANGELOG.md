@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Report unknown localisation keys only when the workspace has no effective definition for them.
+  Empty entries and definitions in other languages count as defined.
+- Resolve mission-tree titles using each entry's language header. Files with no language suffix
+  and files with multiple language headers can supply titles for the selected preview language.
+
 ### Security
 
 - Update bundled SQLite to 3.54.1 to fix the local information disclosure

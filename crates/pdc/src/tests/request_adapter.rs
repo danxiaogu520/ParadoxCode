@@ -761,9 +761,10 @@ fn localisation_documents_publish_no_diagnostics_or_completion() {
 fn mission_preview_returns_renderer_ready_tree_data() {
     let (root, root_uri) = temp_workspace_dir();
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{},"initializationOptions":{"preferredLocalisationLanguages":["french"]}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":format!("{root_uri}/localisation/titles_l_english.yml"),"languageId":"Localisation","version":1,"text":"l_english:\n a1_title:0 \"Alpha One\"\n a2_title:0 \"Alpha Two\"\n"}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":format!("{root_uri}/localisation/titles.yml"),"languageId":"Localisation","version":1,"text":"l_french:\n a1_title:0 \"Titre un\"\n a2_title:0 \"Titre deux\"\nl_english:\n a2_title:0 \"Another English title\"\n"}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"pdc/missionPreview","params":{"path":"missions/test.txt","uri":format!("{root_uri}/missions/test.txt"),"version":7,"text":"main_tree = {\n\tslot = 1\n\ta1 = { position = 1 icon = mission_alpha }\n\ta2 = { position = 2 required_missions = { a1 } }\n}\n\nbranch_tree = {\n\tslot = 2\n\tb1 = { position = 1 required_missions = { external_id } }\n}\n"}}),
         json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -820,16 +821,15 @@ fn mission_preview_returns_renderer_ready_tree_data() {
     assert!(a2["sourceRange"]["end"]["line"].is_u64());
     assert!(a2["sourceRange"]["end"]["character"].is_u64());
     assert_eq!(a2["required"], json!(["a1"]), "edges reachable from ids");
-    // Mission titles resolve from the open localisation overlay via
-    // active workspace definitions; unknown keys fall back to the raw id.
+    // The entry's language header identifies both French titles in the open overlay.
     assert_eq!(a1["titleKey"], "a1_title");
-    assert_eq!(a1["title"]["value"], "Alpha One");
-    assert_eq!(a1["title"]["language"], "l_english");
+    assert_eq!(a1["title"]["value"], "Titre un");
+    assert_eq!(a1["title"]["language"], "l_french");
     let a2_title = nodes
         .iter()
         .find(|node| node["id"] == "a2")
         .expect("a2 node");
-    assert_eq!(a2_title["title"]["value"], "Alpha Two");
+    assert_eq!(a2_title["title"]["value"], "Titre deux");
     let b1 = nodes
         .iter()
         .find(|node| node["id"] == "b1")

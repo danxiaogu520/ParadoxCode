@@ -331,10 +331,20 @@ pub(crate) fn localisation_preview(
     snapshot: &AnalysisSnapshot,
     definition: &ResolutionDefinition,
 ) -> Option<(Option<String>, String)> {
-    if let Some(file) = definition.location.file
-        && let Some(preview) = snapshot.localisation_preview(file, definition.location.range)
+    if definition.location.document.is_none()
+        && let Some(file) = definition.location.file
     {
-        return Some((preview.language.clone(), preview.value.clone()));
+        let range = definition.location.range;
+        let preview = snapshot.localisation_preview(file, range).or_else(|| {
+            let entries = snapshot.file_state(file)?.cached_localisation_previews()?;
+            let index = entries
+                .binary_search_by_key(&range, |(range, _)| *range)
+                .ok()?;
+            Some(&entries[index].1)
+        });
+        if let Some(preview) = preview {
+            return Some((preview.language.clone(), preview.value.clone()));
+        }
     }
     let (language, value) = localisation_text_from_source(snapshot, definition)?;
     Some((language, truncate_localisation_preview(&value)))
@@ -447,20 +457,8 @@ pub(crate) fn localisation_previews_for_name(
         }
     }
     let target = snapshot.localisation_preview_language();
-    previews.retain(|preview| preview_language_is_target(preview.language.as_deref(), target));
+    previews.retain(|preview| vfs::preview_language_is_target(preview.language.as_deref(), target));
     Ok(previews)
-}
-
-/// Whether a preview language in YAML-header form (`l_english`) names the
-/// workspace target language; previews with an unknown (`None`) language
-/// pass through.
-pub(crate) fn preview_language_is_target(language: Option<&str>, target: &str) -> bool {
-    language.is_none_or(|language| {
-        language
-            .strip_prefix("l_")
-            .unwrap_or(language)
-            .eq_ignore_ascii_case(target)
-    })
 }
 
 /// One rendered localisation preview line: the resolved text for one key
