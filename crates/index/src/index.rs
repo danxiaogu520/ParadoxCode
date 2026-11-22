@@ -6,7 +6,10 @@ use std::sync::Arc;
 use text::{PositionRange, TextRange};
 
 use hir::{DefinitionAttributes, Template};
-use vfs::{LocalisationPreview, SourceFileId, WorkspaceError, WorkspaceScanToken};
+use vfs::{
+    LocalisationPreview, SourceFileId, WorkspaceError, WorkspaceScanToken,
+    preview_language_is_target,
+};
 
 /// Compact, file-grouped UTF-16 positions for indexed ranges.
 ///
@@ -401,6 +404,39 @@ impl LocalisationPreviewMap {
     pub fn remove_file(&mut self, file_id: SourceFileId) {
         if let Some(entries) = self.by_file.remove(&file_id) {
             self.len = self.len.saturating_sub(entries.len());
+        }
+    }
+
+    /// Keeps previews whose entry headers match the requested language.
+    pub fn retain_language(&mut self, target: &str) {
+        self.by_file.retain(|_, entries| {
+            Self::retain_file_language(entries, target);
+            !entries.is_empty()
+        });
+        self.recount_len();
+    }
+
+    /// Filters one file's entries, preserving the shared vector when all entries match.
+    pub fn retain_file_language(
+        entries: &mut Arc<Vec<(TextRange, LocalisationPreview)>>,
+        target: &str,
+    ) {
+        let keep = |(_, preview): &(TextRange, LocalisationPreview)| {
+            preview_language_is_target(preview.language.as_deref(), target)
+        };
+        if entries.iter().all(keep) {
+            return;
+        }
+        if let Some(owned) = Arc::get_mut(entries) {
+            owned.retain(keep);
+        } else {
+            *entries = Arc::new(
+                entries
+                    .iter()
+                    .filter(|entry| keep(entry))
+                    .cloned()
+                    .collect(),
+            );
         }
     }
 

@@ -14,7 +14,6 @@ pub mod scan;
 mod string_pool;
 
 pub use encoding::DiskSourceEncoding;
-pub use model::localisation_previews_from_parsed;
 pub use model::{
     DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSource,
     GlobIncludePatterns, LocalisationPreview, ResolvedCandidate, SourceFile, SourceFileId,
@@ -22,6 +21,7 @@ pub use model::{
     WorkspaceScanFilterError, WorkspaceScanFilters, WorkspaceScanIssue, WorkspaceScanIssueKind,
     WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
 };
+pub use model::{localisation_previews_from_parsed, preview_language_is_target};
 pub use parse_cache::{ParseCache, ParseCacheError};
 pub use scan::{
     read_archive_entry_bytes, read_source_file_cancellable, root_priority, split_archive_path,

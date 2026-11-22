@@ -994,9 +994,14 @@ fn vanilla_cache_previews_retain_only_preferred_languages() {
     .expect("French localisation");
     fs::write(
         vanilla.join("localisation/unmarked.yml"),
-        "l_english:\nplain_key:0 \"Unmarked file\"\n",
+        "l_english:\nplain_key:0 \"Unmarked file\"\nl_french:\nplain_french_key:0 \"Fichier sans suffixe\"\n",
     )
     .expect("localisation without a language marker in its path");
+    fs::write(
+        vanilla.join("localisation/other_l_english.yml"),
+        "l_french:\nheader_key:0 \"Texte francais\"\n",
+    )
+    .expect("French header in a file with an English suffix");
 
     let mut builder = eu4_host();
     builder.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
@@ -1033,8 +1038,13 @@ fn vanilla_cache_previews_retain_only_preferred_languages() {
     );
     assert!(
         preview_is_present(&default_preferences, "plain_key"),
-        "files without a path language marker stay retained"
+        "English entries in a file without a language suffix stay retained"
     );
+    assert!(!preview_is_present(
+        &default_preferences,
+        "plain_french_key"
+    ));
+    assert!(!preview_is_present(&default_preferences, "header_key"));
     assert!(
         !preview_is_present(&default_preferences, "french_key"),
         "unpreferred languages are dropped at install while their definitions remain indexed"
@@ -1056,7 +1066,9 @@ fn vanilla_cache_previews_retain_only_preferred_languages() {
         !preview_is_present(&french_preferences, "english_key"),
         "only the target language is retained; English is the default, not a fallback"
     );
-    assert!(preview_is_present(&french_preferences, "plain_key"));
+    assert!(!preview_is_present(&french_preferences, "plain_key"));
+    assert!(preview_is_present(&french_preferences, "plain_french_key"));
+    assert!(preview_is_present(&french_preferences, "header_key"));
 
     fs::remove_dir_all(root).expect("cleanup");
 }

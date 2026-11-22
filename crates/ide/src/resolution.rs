@@ -564,6 +564,22 @@ pub(crate) fn symbol_candidates_for_hover(
     name: &str,
     cancellation: &CancellationToken,
 ) -> Result<Vec<ResolutionDefinition>, Cancelled> {
+    let candidates = sorted_symbol_candidates(snapshot, kind, name, cancellation)?;
+    if kind.eq_ignore_ascii_case("localisation") {
+        Ok(prefer_localisation_language_for_snapshot(
+            snapshot, candidates,
+        ))
+    } else {
+        Ok(candidates)
+    }
+}
+
+fn sorted_symbol_candidates(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    name: &str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<ResolutionDefinition>, Cancelled> {
     let overlay_files = overlay_file_ids(snapshot);
     let suppressed = snapshot.suppressed_overlay_documents();
     let mut candidates = Vec::new();
@@ -607,9 +623,6 @@ pub(crate) fn symbol_candidates_for_hover(
     candidates.dedup_by(|left, right| {
         left.location == right.location && left.selection_range == right.selection_range
     });
-    if kind.eq_ignore_ascii_case("localisation") {
-        candidates = prefer_localisation_language_for_snapshot(snapshot, candidates);
-    }
     Ok(candidates)
 }
 
@@ -708,38 +721,40 @@ pub(crate) fn effective_localisation_candidate(
 }
 
 /// Resolves localisation keys to their effective displayed value — exactly one
-/// value per key, in the workspace target language: candidates are
-/// language-filtered, then the highest layer wins and within that layer the
-/// latest read order wins (the game's later-load override semantics). Keys
-/// with no target-language definition are simply absent from the map.
+/// value per key, in the workspace target language. The entry's language
+/// header determines eligibility. The highest layer and latest read order
+/// within that layer determine which eligible entry wins.
 ///
 /// Used by the LSP mission preview to resolve mission titles (`{id}_title`).
-/// Each key is resolved with a targeted overlay scan plus an exact index lookup
-/// (mirroring `symbol_candidates_for_hover`), so a request never rebuilds the
-/// full workspace semantics — resolving a handful of titles against an
-/// EU4-scale index stays cheap.
+/// The query probes active overlays and the exact index bucket for each key.
 pub fn localisation_values_by_key<'a>(
     snapshot: &AnalysisSnapshot,
     keys: &'a [&'a str],
     cancellation: &CancellationToken,
 ) -> Result<HashMap<String, (Option<String>, String)>, Cancelled> {
+    cancellation.checkpoint()?;
     let target = snapshot.localisation_preview_language();
     let mut resolved = HashMap::new();
     for &key in keys {
         cancellation.checkpoint()?;
-        let candidates = symbol_candidates_for_hover(snapshot, "localisation", key, cancellation)?;
-        let Some(definition) = effective_localisation_candidate(&candidates) else {
-            continue;
-        };
-        let Some((language, value)) =
-            crate::localisation::localisation_preview(snapshot, definition)
-        else {
-            continue;
-        };
-        if !value.is_empty()
-            && crate::localisation::preview_language_is_target(language.as_deref(), target)
-        {
-            resolved.insert(key.to_owned(), (language, value));
+        let candidates = sorted_symbol_candidates(snapshot, "localisation", key, cancellation)?;
+        let by_precedence = candidates
+            .chunk_by(|left, right| left.priority == right.priority)
+            .flat_map(|layer| layer.iter().rev());
+        for definition in by_precedence {
+            cancellation.checkpoint()?;
+            let Some((language, value)) =
+                crate::localisation::localisation_preview(snapshot, definition)
+            else {
+                continue;
+            };
+            if !vfs::preview_language_is_target(language.as_deref(), target) {
+                continue;
+            }
+            if !value.is_empty() {
+                resolved.insert(key.to_owned(), (language, value));
+            }
+            break;
         }
     }
     Ok(resolved)

@@ -579,10 +579,8 @@ fn golden_sprite_bindings_derived_picture() {
 }
 
 #[test]
-fn golden_localisation_language_gate() {
-    // Required mission keys are judged in the target language (english by default):
-    // `mission_lang_title` exists in english and passes, `mission_lang_desc` exists
-    // only in french and is reported even though the key is defined workspace-wide.
+fn golden_localisation_definitions() {
+    // Required mission bindings resolve an empty English title and a French-only description.
     let text = concat!(
         "golden_lang_tree = {\n",
         "\tslot = 1\n",
@@ -609,7 +607,7 @@ fn golden_localisation_language_gate() {
     .expect("write gfx sprite");
     std::fs::write(
         loc_dir.join("golden_lang_l_english.yml"),
-        "l_english:\n mission_lang_title:0 \"Title\"\n",
+        "l_english:\n mission_lang_title:0 \"\"\n",
     )
     .expect("write english localisation");
     std::fs::write(
@@ -626,11 +624,7 @@ fn golden_localisation_language_gate() {
         Some(AbsPath::normalize(&missions_dir.join("golden_lang.txt"))),
     )
     .expect("open golden mission file");
-    assert_golden(
-        "localisation_language_gate",
-        text,
-        &analyze_text(&host, &id),
-    );
+    assert_golden("localisation_definitions", text, &analyze_text(&host, &id));
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 

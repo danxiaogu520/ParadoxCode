@@ -310,10 +310,6 @@ pub(crate) fn analyze_input_with_cancellation(
         });
         diagnostics.values.extend(mission);
     }
-    // Localisation existence is judged in the workspace's target preview language, not
-    // across all languages: a key that only exists in another language renders as its
-    // raw spelling in-game and is reported. One batched resolution serves every
-    // localisation reference below.
     let optional_localisation: std::collections::HashSet<_> = input
         .hir
         .iter()
@@ -321,71 +317,31 @@ pub(crate) fn analyze_input_with_cancellation(
         .filter(|reference| reference.origin == hir::HirReferenceOrigin::OptionalLocalisation)
         .map(|reference| reference.range)
         .collect();
-    let mut localisation_keys = semantic
-        .references
-        .iter()
-        .filter(|reference| {
-            reference.kind.eq_ignore_ascii_case("localisation")
-                && !reference.name.contains('$')
-                && !optional_localisation.contains(&reference.range)
-        })
-        .map(|reference| reference.name.as_str())
-        .collect::<Vec<_>>();
-    localisation_keys.sort_unstable();
-    localisation_keys.dedup();
-    let localisation_target_values =
-        crate::resolution::localisation_values_by_key(snapshot, &localisation_keys, cancellation)?;
     for reference in &semantic.references {
         cancellation.checkpoint()?;
         if reference.name.contains('$') {
             continue;
         }
-        if reference.kind.eq_ignore_ascii_case("localisation") {
-            // Scalar arguments inside a dynamic definition invocation are untyped
-            // parameter values, not localisation key references.
-            if optional_localisation.contains(&reference.range)
-                || localisation_reference_is_dynamic_argument(snapshot, input, reference.range)
-            {
-                continue;
-            }
-            if !localisation_target_values.contains_key(&reference.name) {
-                // The game renders a missing localisation key as its raw spelling,
-                // so a missing key is a data-quality warning rather than a script
-                // error. A key that exists only in other languages gets its own
-                // message naming the target language, so the did-you-mean hint
-                // never suggests the key itself.
-                diagnostics.push(Diagnostic::new(
-                    DiagnosticCode::UnknownLocalisationKey,
-                    DiagnosticCode::UnknownLocalisationKey.severity(),
-                    reference.range,
-                    match resolution.resolve("localisation", &reference.name) {
-                        Resolution::Unique(definition) => {
-                            let defined = crate::resolution::localisation_language(
-                                definition.location.path.as_ref(),
-                            )
-                            .map_or_else(String::new, |language| {
-                                format!(" (defined in {language})")
-                            });
-                            format!(
-                                "localisation key `{}` is missing in {}{}",
-                                reference.name,
-                                snapshot.localisation_preview_language(),
-                                defined
-                            )
-                        }
-                        Resolution::Missing => format!(
-                            "unknown localisation key `{}`{}",
-                            reference.name,
-                            did_you_mean(
-                                localisation_key_suggestion(snapshot, &reference.name).as_deref()
-                            )
-                        ),
-                    },
-                ));
-            }
+        let is_localisation = reference.kind.eq_ignore_ascii_case("localisation");
+        // Localisation-or-text fields and opaque template arguments can contain literal text.
+        if is_localisation
+            && (optional_localisation.contains(&reference.range)
+                || localisation_reference_is_dynamic_argument(snapshot, input, reference.range))
+        {
             continue;
         }
         match resolution.resolve(&reference.kind, &reference.name) {
+            // An effective definition can have an empty value or belong to another language.
+            Resolution::Missing if is_localisation => diagnostics.push(Diagnostic::new(
+                DiagnosticCode::UnknownLocalisationKey,
+                DiagnosticCode::UnknownLocalisationKey.severity(),
+                reference.range,
+                format!(
+                    "unknown localisation key `{}`{}",
+                    reference.name,
+                    did_you_mean(localisation_key_suggestion(snapshot, &reference.name).as_deref())
+                ),
+            )),
             // `on_trigger` and `_trigger`-suffixed carriers may name fixed builtin
             // triggers, not only workspace scripted triggers; likewise for effects.
             Resolution::Missing

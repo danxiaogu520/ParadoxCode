@@ -69,10 +69,10 @@ are called out explicitly.
 
 ## UnknownLocalisationKey
 
-A localisation reference does not resolve to any key in the merged
-localisation of the workspace. This is a warning because the game renders
-the raw key spelling instead of failing. A did-you-mean suggestion is
-included when a close key exists.
+A localisation reference has no effective key definition in the workspace.
+Definitions in any language count, including entries with empty text. The
+game renders a missing key as its raw spelling, so this is a warning. A
+did-you-mean suggestion is included when a close key exists.
 
 ## AmbiguousDefinition
 
