@@ -79,7 +79,11 @@ files, text budgets, and output limits. Such results are partial, including when
 file matches. Cached semantic definitions do not imply that full localisation values or file
 contents are available.
 
-## Event and mission hovers
+## Definition hovers
+
+Definition hovers show available localisation in a **Field** and **Text** table. Click a
+field to open its localisation entry or **Defined in** at the bottom to open the symbol.
+Localisation used by a script effect or trigger can be inspected by hovering that reference.
 
 Hover an event definition or reference and choose **Preview Event** to open its game-style window beside the editor. The preview follows that event while you edit its script or localisation. Click its title, description or option text to open the corresponding localisation entry. Conditional descriptions link to their script. The window grows with the description and scrolls when it exceeds the panel. Artwork is shown when available.
 

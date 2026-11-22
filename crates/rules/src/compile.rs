@@ -730,6 +730,15 @@ impl<'a> Checker<'a> {
                         ),
                     );
                 }
+                if binding.preview_fallback.is_some() && binding.loc.is_none() {
+                    report(
+                        &mut self.diagnostics,
+                        &binding_at.child("preview_fallback"),
+                        DiagnosticCode::Parse,
+                        Severity::Error,
+                        "`preview_fallback` requires a primary `loc` template".to_owned(),
+                    );
+                }
                 if trait_name == "Localised" && binding.sprite.is_some() {
                     report(
                         &mut self.diagnostics,

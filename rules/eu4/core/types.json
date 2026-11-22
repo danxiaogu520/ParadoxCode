@@ -141,6 +141,9 @@
           }
         },
         "Localised": {
+          "desc": {
+            "loc": "building_$_desc"
+          },
           "name": {
             "loc": "building_$",
             "required": true
@@ -692,7 +695,15 @@
     "custom_gui": {},
     "custom_icon": {},
     "custom_shield": {},
-    "custom_text_box": {},
+    "custom_text_box": {
+      "impl": {
+        "Localised": {
+          "name": {
+            "loc": "$"
+          }
+        }
+      }
+    },
     "custom_window": {},
     "customideas": {
       "impl": {
@@ -763,6 +774,10 @@
     "disaster": {
       "impl": {
         "Localised": {
+          "desc": {
+            "loc": "desc_$",
+            "preview_fallback": "$_desc"
+          },
           "name": {
             "loc": "$",
             "required": true
@@ -884,6 +899,7 @@
         "Localised": {
           "desc": {
             "loc": "desc_$",
+            "preview_fallback": "$_desc",
             "required": true
           },
           "name": {
@@ -1153,6 +1169,9 @@
     "guru": {
       "impl": {
         "Localised": {
+          "desc": {
+            "loc": "desc_$"
+          },
           "name": {
             "loc": "$",
             "required": true
@@ -1478,6 +1497,9 @@
     "opinion_modifier": {
       "impl": {
         "Localised": {
+          "desc": {
+            "loc": "desc_$"
+          },
           "name": {
             "loc": "$",
             "required": true
@@ -1532,6 +1554,10 @@
     "parliament_issue": {
       "impl": {
         "Localised": {
+          "desc": {
+            "loc": "desc_$",
+            "preview_fallback": "$_desc"
+          },
           "name": {
             "loc": "$",
             "required": true
@@ -1581,6 +1607,7 @@
         "Localised": {
           "desc": {
             "loc": "desc_$",
+            "preview_fallback": "$_desc",
             "required": true
           },
           "name": {
@@ -1829,6 +1856,7 @@
           },
           "desc": {
             "loc": "desc_$",
+            "preview_fallback": "$_desc",
             "required": true
           },
           "name": {
@@ -1888,6 +1916,10 @@
     "static_modifier": {
       "impl": {
         "Localised": {
+          "desc": {
+            "loc": "desc_$",
+            "preview_fallback": "$_desc"
+          },
           "name": {
             "loc": "$",
             "required": true
@@ -2095,6 +2127,7 @@
         "Localised": {
           "desc": {
             "loc": "desc_$",
+            "preview_fallback": "$_desc",
             "required": true
           },
           "name": {

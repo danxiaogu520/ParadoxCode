@@ -17,8 +17,6 @@ export interface TexturePreview {
     name: string;
     /** Game-root-relative texture path as written in the `.gfx` file. */
     rel: string;
-    /** Source layer of the resolved texture. */
-    origin?: string;
     /** Decoded `data:image/png;base64,...` URL. */
     url: string;
     /** Pixel width of the decoded texture. */
@@ -102,14 +100,21 @@ export function textureImageMarkdown(preview: TexturePreview): string {
     return `![${preview.name}](${toHoverImageUrl(preview.url)}${suffix})`;
 }
 
-/** Appends a `#### Texture` section to an existing sprite hover. */
+/** Inserts an extension section above the server's final definition link. */
+export function insertHoverSection(markdown: string, section: string): string {
+    const footer = markdown.lastIndexOf('\n\nDefined in ');
+    return footer < 0
+        ? `${markdown}\n\n${section}`
+        : `${markdown.slice(0, footer)}\n\n${section}${markdown.slice(footer)}`;
+}
+
+/** Adds a `#### Texture` section to an existing sprite hover. */
 export function appendTextureSection(markdown: string, preview: TexturePreview): string {
-    return `${markdown}\n\n${texturefileHoverMarkdown(preview)}`;
+    return insertHoverSection(markdown, texturefileHoverMarkdown(preview));
 }
 
 /** Standalone hover body for a hovered texturefile value. */
 export function texturefileHoverMarkdown(preview: TexturePreview): string {
     const relative = preview.rel.replaceAll('`', "'");
-    const origin = preview.origin ? ` · \`${preview.origin.replace(/[`\r\n]/g, ' ')}\`` : '';
-    return ['#### Texture', '', `- Path: \`${relative}\`${origin}`, '', textureImageMarkdown(preview)].join('\n');
+    return ['#### Texture', '', `- Path: \`${relative}\``, '', textureImageMarkdown(preview)].join('\n');
 }

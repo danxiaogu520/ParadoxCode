@@ -1,11 +1,6 @@
 {
   "Preview Event": "预览事件",
   "Locate in Mission Tree": "在任务树中定位",
-  "Country event": "国家事件",
-  "Province event": "省份事件",
-  "Missing localisation ({0}): {1}": "缺少本地化（{0}）：{1}",
-  "Ambiguous prerequisite: {0}": "前置任务存在多个同优先级定义：{0}",
-  "Missing prerequisite: {0}": "找不到前置任务：{0}",
   "Conditional description — open script": "按条件选择描述，点击查看脚本",
   "Loading event preview…": "正在加载事件预览…",
   "Mission {0} is no longer at this location.": "此位置已找不到任务 {0}。",

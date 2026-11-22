@@ -131,8 +131,7 @@ pub fn hover_with_cancellation(
             } else {
                 "defined_text"
             };
-            let model =
-                symbol::hover_for_symbol(snapshot, kind, &name, fragment_range, cancellation)?;
+            let model = symbol::hover_for_symbol(snapshot, kind, &name, None, cancellation)?;
             return Ok(Some(model.into_hover_with_range(fragment_range)));
         }
         let mut model = HoverModel::new(format!("### {}", code_span(&name)));
@@ -165,35 +164,13 @@ pub fn hover_with_cancellation(
             snapshot,
             &definition.kind,
             &definition.name,
-            range,
-            cancellation,
-        )?;
-        if matches!(definition.kind.as_str(), "event" | "mission") {
-            let local = crate::resolution::ResolutionDefinition {
+            Some(crate::resolution::ResolutionDefinition {
                 location: definition.symbol.location.clone(),
                 selection_range: definition.symbol.selection_range,
                 priority: 0,
-            };
-            if model.preview.as_ref().is_none_or(|target| {
-                target.location != crate::resolution::definition_selection_location(&local)
-            }) {
-                let localisation = crate::localisation::symbol_localisation_preview(
-                    snapshot,
-                    &definition.kind,
-                    &definition.name,
-                    &local,
-                    cancellation,
-                )?;
-                model.preview = Some(symbol::preview_target(
-                    snapshot,
-                    &definition.kind,
-                    &definition.name,
-                    &local,
-                    &localisation,
-                    cancellation,
-                )?);
-            }
-        }
+            }),
+            cancellation,
+        )?;
         if let Some(scope) = input
             .hir
             .as_deref()
@@ -222,7 +199,7 @@ pub fn hover_with_cancellation(
             snapshot,
             &spec.symbol_kind,
             &member.value,
-            member.range,
+            None,
             cancellation,
         )?;
         return Ok(Some(model.into_hover_with_range(member.range)));
@@ -232,14 +209,14 @@ pub fn hover_with_cancellation(
     });
     if let Some(first) = references.next() {
         let mut best =
-            symbol::hover_for_symbol(snapshot, &first.kind, &first.name, range, cancellation)?;
+            symbol::hover_for_symbol(snapshot, &first.kind, &first.name, None, cancellation)?;
         if !best.has_localisation_preview {
             for reference in references {
                 let hover = symbol::hover_for_symbol(
                     snapshot,
                     &reference.kind,
                     &reference.name,
-                    range,
+                    None,
                     cancellation,
                 )?;
                 if hover.has_localisation_preview {

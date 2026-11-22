@@ -1,11 +1,6 @@
 {
   "Preview Event": "Preview Event",
   "Locate in Mission Tree": "Locate in Mission Tree",
-  "Country event": "Country event",
-  "Province event": "Province event",
-  "Missing localisation ({0}): {1}": "Missing localisation ({0}): {1}",
-  "Ambiguous prerequisite: {0}": "Ambiguous prerequisite: {0}",
-  "Missing prerequisite: {0}": "Missing prerequisite: {0}",
   "Conditional description — open script": "Conditional description — open script",
   "Loading event preview…": "Loading event preview…",
   "Mission {0} is no longer at this location.": "Mission {0} is no longer at this location.",

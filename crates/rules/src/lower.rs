@@ -595,6 +595,10 @@ impl<'a> Lowering<'a> {
                 .as_deref()
                 .map(|s| self.strings.intern_verbatim(s)),
             loc,
+            preview_fallback: spec
+                .preview_fallback
+                .as_deref()
+                .map(|text| self.strings.intern_verbatim(text)),
             sprite,
             required: spec.required.unwrap_or(false),
         }

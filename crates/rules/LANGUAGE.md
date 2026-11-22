@@ -556,6 +556,9 @@ changing Rust, because the runtime must understand its semantics:
 - A binding can set `strip_prefix` to remove a leading affix before expanding
   its template. The match is ASCII case-insensitive and retains the remaining
   spelling. `$` inserts the name and `${upper}` inserts its ASCII uppercase form.
+- A localisation binding can set `preview_fallback` to a second template. A
+  definition hover uses it when the primary key supplies no text. The `loc`
+  template still supplies the binding for reference and validation queries.
 - `impl` is declared on the type and applies to every instance.
 - For a string field accepting both a translation key and raw text,
   `ref<localisation> | scalar` indexes a reference when the key exists. Other

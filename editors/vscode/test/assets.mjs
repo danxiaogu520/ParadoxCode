@@ -463,6 +463,13 @@ function tgaHeader(width, height, bpp, descriptor) {
     const standalone = hover.texturefileHoverMarkdown(preview);
     assert.ok(standalone.startsWith('#### Texture\n\n- Path: `gfx/interface/x.dds`\n\n'));
     assert.ok(standalone.includes('|width=400'));
+    const source = 'Defined in [interface/test.gfx](file:///interface/test.gfx#L3,2)';
+    const sprite = '### sprite `GFX_x`\n\n' + source;
+    assert.ok(hover.appendTextureSection(sprite, preview).endsWith('\n\n' + source));
+    assert.equal(
+        hover.insertHoverSection(sprite, '[Preview Event](command:paradoxcode.previewEvent)'),
+        '### sprite `GFX_x`\n\n[Preview Event](command:paradoxcode.previewEvent)\n\n' + source,
+    );
 
     // VS Code's Hover class always wraps contents in an array, and the
     // languageclient's MarkupContent conversion is a bare MarkdownString;
