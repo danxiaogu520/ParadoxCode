@@ -39,6 +39,7 @@ pub fn execute(mode: &str, arguments: &[String]) -> Result<String, String> {
             "--line",
             "--character",
             "--dependency",
+            "--dependency-index",
         ],
         &[
             "--no-cache",
@@ -105,6 +106,9 @@ pub fn execute(mode: &str, arguments: &[String]) -> Result<String, String> {
     let cache = args
         .path("--cache")
         .or_else(|| args.path("--vanilla-cache"));
+    if cache.is_some() && args.flag("--no-cache") {
+        return Err("choose either --cache or --no-cache".into());
+    }
     if cache.is_none() && !args.flag("--no-cache") {
         return Err("select --cache or explicit --no-cache".into());
     }
@@ -115,17 +119,8 @@ pub fn execute(mode: &str, arguments: &[String]) -> Result<String, String> {
         options["vanillaIndexCache"] =
             json!(std::path::absolute(cache).map_err(|e| e.to_string())?);
     }
-    if let Some(dependencies) = args.values.get("--dependency") {
-        options["dependencies"] = json!(
-            dependencies
-                .iter()
-                .map(|s| s
-                    .split_once('=')
-                    .map(|(id, path)| json!({"id":id,"path":path}))
-                    .ok_or("--dependency must be ID=PATH"))
-                .collect::<Result<Vec<_>, _>>()?
-        );
-    }
+    let dependencies = super::dependencies::Dependencies::new(&args, &workspace)?;
+    options["dependencies"] = json!(dependencies.options);
     let started = Instant::now();
     let mut client = Client::spawn(&binary, &workspace, timeout)?;
     let mut sampler = super::sampler::Sampler::start(client.pid(), sample_interval);
@@ -141,15 +136,21 @@ pub fn execute(mode: &str, arguments: &[String]) -> Result<String, String> {
         .unwrap_or(if mode == "probe" { "0" } else { "20000" })
         .parse::<u64>()
         .map_err(|e| e.to_string())?;
-    let idle_start = super::sampler::sample(client.pid()).ok();
+    let idle_start = (idle_ms > 0)
+        .then(|| super::sampler::sample(client.pid()).ok())
+        .flatten();
+    let idle_started = Instant::now();
     std::thread::sleep(Duration::from_millis(idle_ms));
-    let idle_end = super::sampler::sample(client.pid()).ok();
+    let idle_end = (idle_ms > 0)
+        .then(|| super::sampler::sample(client.pid()).ok())
+        .flatten();
+    let idle_observed = idle_started.elapsed().as_secs_f64();
     let idle_cpu = idle_start
         .as_ref()
         .and_then(|s| s["cpu_seconds"].as_f64())
         .zip(idle_end.as_ref().and_then(|s| s["cpu_seconds"].as_f64()))
         .map(|(a, b)| (b - a).max(0.0));
-    let idle = json!({"window_ms":idle_ms,"cpu_seconds":idle_cpu,"cpu_rate_percent":idle_cpu.filter(|_|idle_ms>0).map(|seconds|seconds/(idle_ms as f64/1000.0)*100.0)});
+    let idle = json!({"window_ms":idle_ms,"observed_window_ms":(idle_ms>0).then_some(idle_observed*1000.0),"cpu_seconds":idle_cpu,"cpu_rate_percent":idle_cpu.map(|seconds|seconds/idle_observed*100.0)});
     let mut files = if let Some(path) = args.path("--document") {
         vec![if path.is_absolute() {
             path
@@ -200,7 +201,8 @@ pub fn execute(mode: &str, arguments: &[String]) -> Result<String, String> {
     let word_pattern = regex::Regex::new(r"[A-Za-z_][A-Za-z0-9_.-]*").unwrap();
     let completion_pattern = regex::Regex::new(r"^(\s*)([A-Za-z0-9_.@]+)\s*=").unwrap();
     for path in selected {
-        let text = report::text(&fs::read(path).map_err(|e| e.to_string())?).0;
+        let bytes = fs::read(path).map_err(|e| e.to_string())?;
+        let text = report::text(&bytes).0;
         let uri = lsp::uri(path)?;
         let preferred = if mode == "probe" {
             text.find("my_perf_event")
@@ -238,7 +240,7 @@ pub fn execute(mode: &str, arguments: &[String]) -> Result<String, String> {
                 "--edit-grace-ms",
                 if mode == "probe" { 60_000 } else { 2000 },
             )? as u64),
-            |p| p["uri"] == uri,
+            |p| p["uri"] == uri && p["version"] == 1,
         );
         let open_ms = if published.is_ok() {
             Some(start.elapsed().as_secs_f64() * 1000.0)
@@ -246,12 +248,15 @@ pub fn execute(mode: &str, arguments: &[String]) -> Result<String, String> {
             None
         };
         let mut item = json!({"path":path.strip_prefix(&workspace).unwrap().to_string_lossy().replace('\\',"/"),"open_diagnostics_ms":open_ms,"open_publication":if published.is_ok(){"observed"}else{"suppressed-or-unobserved"}});
+        item["source_sha256"] = json!(report::hash(&bytes));
+        item["hover_position"] = json!({"line":line,"character":character});
         let start = Instant::now();
-        client.request(
+        let hover = client.request(
             "textDocument/hover",
             json!({"textDocument":{"uri":uri},"position":{"line":line,"character":character}}),
         )?;
         item["hover_ms"] = json!(start.elapsed().as_secs_f64() * 1000.0);
+        item["hover_present"] = json!(!hover.is_null());
         let positions = if mode == "compare" {
             let pattern = &completion_pattern;
             text.split('\n')
@@ -327,7 +332,8 @@ pub fn execute(mode: &str, arguments: &[String]) -> Result<String, String> {
     let summary = client.request("pdc/workspaceSummary", Value::Null)?;
     client.shutdown()?;
     let sampled = sampler.finish();
-    let result = json!({"status":"measured-review-required","label":args.get("--label"),"server":{"path":binary,"version":initialized["serverInfo"]["version"],"binary_sha256":report::file_hash(&binary)?},"workspace":workspace,"cache_mode":if args.flag("--no-cache"){"disabled"}else{"explicit"},"phases":{"initialize_ms":initialize_ms,"ready_ms":ready_ms,"cold_start_ms":cold_start_ms,"total_ms":started.elapsed().as_secs_f64()*1000.0},"measurements":measurements,"idle":idle,"process":sampled,"workspace_summary":summary,"publication_note":"Absent notifications are explicitly unobserved or deduplicated; no zero latency is synthesized"});
+    let mut result = json!({"status":"measured-review-required","label":args.get("--label"),"server":{"path":binary,"version":initialized["serverInfo"]["version"],"binary_sha256":report::file_hash(&binary)?},"workspace":workspace,"cache_mode":if args.flag("--no-cache"){"disabled"}else{"explicit"},"phases":{"initialize_ms":initialize_ms,"ready_ms":ready_ms,"cold_start_ms":cold_start_ms,"total_ms":started.elapsed().as_secs_f64()*1000.0},"measurements":measurements,"idle":idle,"process":sampled,"workspace_summary":summary,"publication_note":"Absent notifications are explicitly unobserved or deduplicated; no zero latency is synthesized"});
+    result["dependency_inputs"] = json!(dependencies.inventory);
     report::write(&output, &result)?;
     if fixture && args.flag("--keep-workspace") {
         let kept = temporary.keep();
@@ -342,6 +348,20 @@ pub fn execute(mode: &str, arguments: &[String]) -> Result<String, String> {
 pub fn compare_files(before: &Path, after: &Path) -> Result<String, String> {
     let before = report::json(before)?;
     let after = report::json(after)?;
+    if before.get("workload").is_some() || after.get("workload").is_some() {
+        return super::suite::compare_reports(&before, &after);
+    }
+    if ["/cache_mode", "/idle/window_ms", "/dependency_inputs"]
+        .iter()
+        .any(|p| {
+            before
+                .pointer(p)
+                .zip(after.pointer(p))
+                .is_some_and(|(a, b)| a != b)
+        })
+    {
+        return Err("probe cache modes, dependencies or idle windows differ".into());
+    }
     let mut lines = vec![
         "| Metric | Before | After | Change |".into(),
         "| --- | ---: | ---: | ---: |".into(),
@@ -353,14 +373,79 @@ pub fn compare_files(before: &Path, after: &Path) -> Result<String, String> {
         let right = after["phases"][key]
             .as_f64()
             .ok_or("missing candidate phase")?;
-        lines.push(format!(
-            "| {key} | {left:.3} | {right:.3} | {} |",
-            if left == 0.0 {
-                "n/a".into()
-            } else {
-                format!("{:+.2}%", (right - left) / left * 100.0)
-            }
+        lines.push(comparison_row(key, Some(left), Some(right)));
+    }
+    let Some((a, b)) = before["measurements"]
+        .as_array()
+        .zip(after["measurements"].as_array())
+    else {
+        lines.push("\nPer-document samples are unavailable in this report pair.".into());
+        return Ok(lines.join("\n"));
+    };
+    if a.len() != b.len() {
+        return Err("probe document inventories differ".into());
+    }
+    for (old, new) in a.iter().zip(b) {
+        let path = old["path"].as_str().ok_or("missing probe path")?;
+        if old["path"] != new["path"]
+            || ["source_sha256", "hover_position", "hover_present"]
+                .iter()
+                .any(|key| old.get(key).zip(new.get(key)).is_some_and(|(a, b)| a != b))
+        {
+            return Err(format!("probe inputs or hover outcome differ for {path}"));
+        }
+        let probes = |v: &Value| -> Result<Vec<Value>, String> {
+            Ok(v["completion_probes"]
+                .as_array()
+                .ok_or("missing completion probes")?
+                .iter()
+                .map(|p| json!([p["position"], p["items"], p["is_incomplete"]]))
+                .collect())
+        };
+        if old.get("completion_probes").is_some()
+            && new.get("completion_probes").is_some()
+            && probes(old)? != probes(new)?
+        {
+            return Err(format!("probe completion workload differs for {path}"));
+        }
+        for key in [
+            "open_diagnostics_ms",
+            "hover_ms",
+            "completion_ms",
+            "edit_diagnostics_ms",
+        ] {
+            lines.push(comparison_row(
+                &format!("{path}/{key}"),
+                old[key].as_f64(),
+                new[key].as_f64(),
+            ));
+        }
+    }
+    for (name, pointer) in [
+        (
+            "peak working set (bytes)",
+            "/process/peak_working_set_bytes",
+        ),
+        ("idle CPU (%)", "/idle/cpu_rate_percent"),
+    ] {
+        lines.push(comparison_row(
+            name,
+            before.pointer(pointer).and_then(Value::as_f64),
+            after.pointer(pointer).and_then(Value::as_f64),
         ));
     }
     Ok(lines.join("\n"))
+}
+
+fn comparison_row(name: &str, before: Option<f64>, after: Option<f64>) -> String {
+    let display = |v: Option<f64>| v.map_or_else(|| "unobserved".into(), |n| format!("{n:.3}"));
+    let change = before.zip(after).filter(|(a, _)| *a > 0.0).map_or_else(
+        || "n/a".into(),
+        |(a, b)| format!("{:+.2}%", (b - a) / a * 100.0),
+    );
+    format!(
+        "| {name} | {} | {} | {change} |",
+        display(before),
+        display(after)
+    )
 }

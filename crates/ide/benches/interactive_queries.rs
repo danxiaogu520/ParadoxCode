@@ -100,16 +100,16 @@ fn main() {
     .expect("bounded position");
 
     let diagnostics_cold = timed(|| {
-        let _ = diagnostics(&snapshot, current);
+        std::hint::black_box(diagnostics(&snapshot, current));
     });
     let diagnostics_warm = measured(10, || {
-        let _ = diagnostics(&snapshot, current);
+        std::hint::black_box(diagnostics(&snapshot, current));
     });
     let hover_cold = timed(|| {
-        let _ = hover(&snapshot, current, hover_position);
+        assert!(hover(&snapshot, current, hover_position).is_some());
     });
     let hover_warm = measured(30, || {
-        let _ = hover(&snapshot, current, hover_position);
+        std::hint::black_box(hover(&snapshot, current, hover_position));
     });
     let completion_cold = timed(|| {
         let result = complete(&snapshot, current, completion_position);
@@ -123,22 +123,19 @@ fn main() {
         std::hint::black_box(complete(&snapshot, current, completion_position));
     });
 
-    println!(
-        "diagnostics: cold {:.3} ms, warm {:.3} ms/query ({} indexed files, {OVERLAY_DOCS} overlays, {REFERENCE_CALLS_PER_DOC} references per overlay)",
-        diagnostics_cold.as_secs_f64() * 1_000.0,
-        diagnostics_warm.as_secs_f64() * 1_000.0 / 10.0,
-        scan.indexed_files,
-    );
-    println!(
-        "hover:       cold {:.3} ms, warm {:.3} ms/query",
-        hover_cold.as_secs_f64() * 1_000.0,
-        hover_warm.as_secs_f64() * 1_000.0 / 30.0,
-    );
-    println!(
-        "completion:  cold {:.3} ms, warm {:.3} ms/query",
-        completion_cold.as_secs_f64() * 1_000.0,
-        completion_warm.as_secs_f64() * 1_000.0 / 30.0,
-    );
+    for (name, elapsed, queries) in [
+        ("diagnostics first", diagnostics_cold, 1),
+        ("diagnostics repeat", diagnostics_warm, 10),
+        ("hover first", hover_cold, 1),
+        ("hover repeat", hover_warm, 30),
+        ("completion first", completion_cold, 1),
+        ("completion repeat", completion_warm, 30),
+    ] {
+        println!(
+            "{name}: {:.6} ms",
+            elapsed.as_secs_f64() * 1000.0 / f64::from(queries)
+        );
+    }
 
     std::fs::remove_dir_all(&root).expect("cleanup fixture");
 }

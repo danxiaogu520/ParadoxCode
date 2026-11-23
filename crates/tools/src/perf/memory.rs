@@ -104,7 +104,7 @@ pub fn measured(binary: &Path, source: &Path, output: &Path) -> Result<Value, St
         .iter()
         .filter(|p| !phases.contains_key(**p))
         .collect::<Vec<_>>();
-    let result = json!({"binary":binary,"binary_sha256":report::file_hash(binary)?,"root":source,"exit_code":status.code(),"elapsed_seconds":started.elapsed().as_secs_f64(),"peak_rss_bytes":peak,"phase_rss_bytes":phases,"sampler_errors":errors,"missing_phases":missing,"diagnostics":diagnostics,"method":"platform time utility wait4 peak for measured child; ps phase RSS for that child PID","limitations":"OS allocator retention and memory compression affect RSS; diagnostic workloads can differ"});
+    let result = json!({"binary":binary,"binary_sha256":report::file_hash(binary)?,"root":source,"exit_code":status.code(),"elapsed_seconds":started.elapsed().as_secs_f64(),"peak_rss_bytes":peak,"phase_rss_bytes":phases,"sampler_errors":errors,"missing_phases":missing,"diagnostics":diagnostics,"method":"platform time utility wait4 peak for measured child; phase RSS from that child PID","limitations":"OS allocator retention and memory compression affect RSS; diagnostic workloads can differ"});
     report::write(output, &result)?;
     if !status.success() {
         return Err(format!("measured child failed: {status}"));
@@ -157,8 +157,14 @@ pub fn execute(arguments: &[String]) -> Result<String, String> {
         ("before".into(), Vec::new()),
         ("after".into(), Vec::new()),
     ]);
+    let mut order = Vec::new();
     for i in 0..repeat {
-        for (label, binary) in [("before", &before), ("after", &after)] {
+        let mut pair = [("before", &before), ("after", &after)];
+        if i % 2 == 1 {
+            pair.reverse();
+        }
+        for (label, binary) in pair {
+            order.push(label);
             let result = measured(
                 binary,
                 &source,
@@ -219,7 +225,7 @@ pub fn execute(arguments: &[String]) -> Result<String, String> {
     }
     let identical = all_signatures && signatures.len() == 1;
     let failed = args.flag("--require-identical-diagnostics") && !identical;
-    let result = json!({"status":if failed{"failed-diagnostic-comparison"}else{"measured-review-required"},"repeat":repeat,"runs":runs,"summary":summary,"diagnostic_signatures_match":identical,"identical_diagnostics_required":args.flag("--require-identical-diagnostics"),"phase_sampling_complete":sampling_complete,"limitations":"Local sequential measurements; different rule semantics can change the diagnosis workload"});
+    let result = json!({"status":if failed{"failed-diagnostic-comparison"}else{"measured-review-required"},"repeat":repeat,"order":order,"runs":runs,"summary":summary,"diagnostic_signatures_match":identical,"identical_diagnostics_required":args.flag("--require-identical-diagnostics"),"phase_sampling_complete":sampling_complete,"limitations":"Local sequential measurements; different rule semantics can change the diagnosis workload"});
     report::write(&output.join("comparison.json"), &result)?;
     if failed {
         return Err("missing or differing diagnostic signatures in memory pairs".into());

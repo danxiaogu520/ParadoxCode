@@ -24,7 +24,7 @@ const USAGE: &str = "usage: cargo run --locked -p tools -- <command> ...
   check policy|release|all [--root <repository root>]
   rules check|fmt|schema|bake ...
   audit diagnose|sweep|baseline|errors|diff|completions|templates ...
-  perf bench|baseline|ab|sweep|completion|probe|compare|memory|profile|init|status|import-corpus|control ...
+  perf suite|pair|bench|baseline|ab|sweep|completion|probe|compare|memory|profile|init|status|import-corpus|control ...
   editor check|compile|test|package ...
   lsp test [--server PATH] [--root <repository root>]
   fuzz smoke [--runs N] [--seed N] [--target TARGET]
@@ -467,6 +467,7 @@ fn build_cache(
     // An existing validated cache is refreshed in place: only files whose content fingerprint
     // changed are reindexed. Any load or refresh failure (missing file, stale rules, corrupt
     // data) falls back to a full scan and rebuild.
+    let refresh_started = Instant::now();
     if let Ok(existing) =
         IndexCache::load_cancellable_for_install(output, &WorkspaceScanToken::new())
         && let Ok(cache) = existing.refresh_with_ir(&rules, &profile, &ir)
@@ -475,9 +476,10 @@ fn build_cache(
         cache.save(output)?;
         let save_elapsed = save_started.elapsed();
         return Ok(format!(
-            "{label} cache refreshed from {}\nindexed files: {}\nscan time: 0 ms\ncache save: {} ms\ntotal time: {} ms\nsource fingerprint: {}\nrules hash: {}",
+            "{label} cache refreshed from {}\nindexed files: {}\ncache load and refresh: {} ms\ncache save: {} ms\ntotal time: {} ms\nsource fingerprint: {}\nrules hash: {}",
             output.display(),
             cache.metadata().indexed_files,
+            save_started.duration_since(refresh_started).as_millis(),
             save_elapsed.as_millis(),
             started.elapsed().as_millis(),
             cache.metadata().source_fingerprint,

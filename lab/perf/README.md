@@ -3,6 +3,23 @@
 性能工作流已迁入 Rust [tools](../../crates/tools/README.md#performance-measurements)。
 从仓库根目录运行 `cargo run --locked -p tools -- perf --help`。
 
+当前版本的整体 LSP 测量入口为 `cargo run --release --locked -p tools -- perf suite`。
+它在临时项目中运行真实 stdio 服务端，依次测量首次构建依赖索引、带缓存重启、编辑查询、
+诊断发布、并发与取消、磁盘变更和全工作区命令。默认三组独立会话，每组各测一次首次查询
+和五次重复查询。原始样本、统计量、进程资源和校验结果写入 `target/performance-results/suite.json`。
+通过 `--files` 和 `--document-entries` 分别扩大工作区和打开文件，通过 `--server` 指定冻结的二进制。
+配对命令、场景清单和阈值口径见 [tools 指南](../../crates/tools/README.md#performance-measurements)。
+两个服务端版本可用 `perf pair --before 基线程序 --after 候选程序 --pairs 4 --edit-rounds 20`
+做同机交替配对。报告保留每对原始数据、差值和波动范围。默认在四对中至少三对同时超过
+20% 和 5 ms 时报告该指标回退。使用 `--enforce` 会让这类回退触发非零退出码。
+长会话可用 `perf suite --sessions 1 --soak-cycles 100`。每轮在不同文件间修改模板、
+连续输入并关闭覆盖文档，检查候选新鲜度和符号撤销，按窗口记录末键延迟、CPU 和工作集。
+给 PR 添加 `perf-validation` 标签后，Windows 和 Linux runner 会分别构建该 PR 的基线和候选提交，
+在同一台机器上配对。五项关键延迟中有一项出现持续回退，就会使对应的 Performance 检查失败。
+任务摘要列出各项样本数、差值和超限对数，原始报告保存在附件中。
+真实 Mod 重放可用 `--dependency ID=源码目录` 指定依赖，再用同一 ID 的
+`--dependency-index ID=索引路径` 测量已有依赖索引的启动。工具会为本轮复制依赖索引。
+
 0.5.1 后的性能修复覆盖规则身份复用、工作区符号查询、补全候选筛选和任务树排版。
 补全基准启用生产 Rules IR 并要求实际产生候选。任务树排版基准测量 JavaScript 计算，
 真实 GPU 帧率需要在编辑器宿主中另行测量。
@@ -61,6 +78,8 @@ Vanilla 缓存含 8,687 个文件，EDG 含 7,887 个文件，再加一个自有
 
 | 命令 | 职责 |
 | --- | --- |
+| `perf suite` | 可复现的完整服务端会话、逐场景正确性校验、资源采样和回归比较 |
+| `perf pair` | 同一 runner 上交替运行两份服务端，按独立配对判断启动、编辑和磁盘变更耗时 |
 | `perf bench` | 预热、重复基准、原始日志和中位数 |
 | `perf baseline / ab` | 冻结二进制、基线和阈值比较 |
 | `perf sweep` | 全量语料、查询电池、阶段和进程资源 |
@@ -239,4 +258,4 @@ Windows VS Code 1.147.0 中，使用临时工作区和本地 EDG 本地化文件
 冷测量创建独立的新缓存，构建时间单列为 `cache_build_ms`，保留已有缓存。
 
 诊断正确性归[语义审计](../audit/README.md)。远端 [Performance 工作流](../../.github/workflows/performance.yml)
-只测仓库自有 benchmark。平台依赖、具体命令和统计边界见 tools 指南。
+运行仓库自有 stdio 场景和 Rust benchmark。平台依赖、具体命令和统计边界见 tools 指南。

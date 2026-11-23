@@ -2,6 +2,7 @@
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::fs;
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
 pub fn json(path: &Path) -> Result<Value, String> {
@@ -22,9 +23,23 @@ pub fn hash(bytes: &[u8]) -> String {
         .collect()
 }
 pub fn file_hash(path: &Path) -> Result<String, String> {
-    Ok(hash(
-        &fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?,
-    ))
+    let mut file = fs::File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut digest = Sha256::new();
+    let mut block = [0u8; 32 * 1024];
+    loop {
+        let count = file
+            .read(&mut block)
+            .map_err(|e| format!("{}: {e}", path.display()))?;
+        if count == 0 {
+            break;
+        }
+        digest.update(&block[..count]);
+    }
+    Ok(digest
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect())
 }
 fn canonical_output(path: &Path) -> Result<PathBuf, String> {
     let path = normalized_absolute(path)?;
@@ -42,10 +57,8 @@ fn canonical_output(path: &Path) -> Result<PathBuf, String> {
 }
 fn normalized_absolute(path: &Path) -> Result<PathBuf, String> {
     let mut result = PathBuf::new();
-    for component in std::path::absolute(path)
-        .map_err(|e| e.to_string())?
-        .components()
-    {
+    let absolute = std::path::absolute(path).map_err(|e| e.to_string())?;
+    for component in dunce::simplified(&absolute).components() {
         match component {
             Component::ParentDir => {
                 if !result.pop() {
@@ -122,6 +135,14 @@ pub fn ensure_complete(report: &Value) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
+    #[test]
+    fn canonical_root_accepts_ordinary_absolute_output_paths() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().canonicalize().unwrap();
+        let path = dunce::simplified(&root).join("target/performance-results/report.json");
+        assert!(output(&root, &path, "performance-results").is_ok());
+    }
     #[test]
     fn output_rejects_traversal_and_symlink_escape() {
         let root = tempfile::tempdir().unwrap();

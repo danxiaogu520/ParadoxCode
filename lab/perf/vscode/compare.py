@@ -79,11 +79,14 @@ def main():
     parser.add_argument("--baseline", nargs="+", required=True)
     parser.add_argument("--candidate", nargs="+", required=True)
     args = parser.parse_args()
-    assert len(args.baseline) == len(args.candidate), "Use matched A/B runs"
+    if len(args.baseline) != len(args.candidate):
+        parser.error("Use matched A/B runs")
     comparisons, failures, extra = [], [], []
     item_count = response_count = 0
     for before, after in zip(args.baseline, args.candidate):
         a, b = (read(args.directory / f"host-{name}.json") for name in (before, after))
+        if a.get("readinessMeasurement") != b.get("readinessMeasurement"):
+            failures.append({"pair": [before, after], "field": "readiness measurement protocol"})
         for field in ("sourceSha256",):
             if a[field] != b[field]:
                 failures.append({"pair": [before, after], "field": field})
@@ -111,7 +114,7 @@ def main():
     result = {"baseline": summarize(args.directory, args.baseline),
               "candidate": summarize(args.directory, args.candidate),
               "matchedResponses": response_count, "comparedItems": item_count,
-              "equal": not failures, "failures": failures, "extraResponseCounts": extra,
+              "equal": not (failures or extra), "failures": failures, "extraResponseCounts": extra,
               "comparisons": comparisons}
     result["latencyTarget"] = {"targetMs": 100,
                                "allEditedUnderTarget": result["candidate"]["edited"]["maxMs"] < 100,
@@ -122,7 +125,7 @@ def main():
     destination = args.directory / "vscode-comparison.json"
     destination.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({k: v for k, v in result.items() if k != "comparisons"}, ensure_ascii=False, indent=2))
-    raise SystemExit(bool(failures))
+    raise SystemExit(bool(failures or extra))
 
 
 if __name__ == "__main__":

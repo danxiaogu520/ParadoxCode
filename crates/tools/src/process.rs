@@ -47,15 +47,33 @@ pub fn server(root: &Path, explicit: Option<&str>) -> Result<PathBuf, String> {
         }
         return Ok(path);
     }
-    let name = if cfg!(windows) {
-        "paradoxcode.exe"
-    } else {
-        "paradoxcode"
-    };
-    let path = root.join("target/debug").join(name);
-    cargo(
-        root,
-        &["build", "--locked", "-p", "pdc", "--bin", "paradoxcode"],
-    )?;
-    Ok(path)
+    build_server(root, false)
+}
+
+/// Use the executable Cargo actually produced, including for a shared target directory.
+pub fn build_server(root: &Path, release: bool) -> Result<PathBuf, String> {
+    let mut build = command("cargo");
+    build.current_dir(root).args([
+        "build",
+        "--locked",
+        "-p",
+        "pdc",
+        "--bin",
+        "paradoxcode",
+        "--message-format=json-render-diagnostics",
+    ]);
+    if release {
+        build.arg("--release");
+    }
+    build.stderr(std::process::Stdio::inherit());
+    let output = capture(&mut build)?;
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .find_map(|message| {
+            (message["reason"] == "compiler-artifact" && message["target"]["name"] == "paradoxcode")
+                .then(|| message["executable"].as_str().map(PathBuf::from))
+                .flatten()
+        })
+        .ok_or_else(|| "Cargo did not report a paradoxcode executable".into())
 }

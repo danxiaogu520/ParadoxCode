@@ -16,7 +16,6 @@ default = ["analysis"]
 analysis = [
     "dep:text",
     "dep:parser",
-    "dep:dunce",
     "dep:pdc",
     "dep:rules",
     "dep:game",
@@ -29,7 +28,7 @@ analysis = [
 [dependencies]
 text = { path = "../text", optional = true }
 parser = { path = "../parser", optional = true }
-dunce = { version = "1.0", optional = true }
+dunce = "1.0"
 pdc = { path = "../pdc", optional = true }
 rules = { path = "../rules", optional = true }
 game = { path = "../game", optional = true }

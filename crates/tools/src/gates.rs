@@ -89,16 +89,26 @@ pub fn gate_actions(group: &str) -> Option<Vec<GateAction>> {
     match group {
         "core" => Some(core(true)),
         "core-fast" => Some(core(false)),
-        "perf" => Some(vec![cargo_step(
-            &[
-                "bench",
-                "--locked",
-                "--workspace",
-                "--all-features",
-                "--benches",
-            ],
-            Vec::new(),
-        )]),
+        "perf" => Some(
+            ["suite", "bench"]
+                .into_iter()
+                .map(|name| {
+                    cargo_step(
+                        &[
+                            "run",
+                            "--locked",
+                            "--release",
+                            "-p",
+                            "tools",
+                            "--",
+                            "perf",
+                            name,
+                        ],
+                        Vec::new(),
+                    )
+                })
+                .collect(),
+        ),
         "vscode" => Some(vec![GateAction::EditorTests]),
         "lsp" => Some(vec![GateAction::LspTests]),
         "audit" => Some(vec![cargo_step(
