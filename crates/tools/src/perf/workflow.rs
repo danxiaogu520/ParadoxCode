@@ -121,12 +121,17 @@ fn bench_metrics(text: &str) -> Result<BTreeMap<String, f64>, String> {
         regex::Regex::new(r"^Running\s+(?:.*[/\\])?benches[/\\]([^/\\]+)\.rs\s+\(").unwrap();
     let mut name = None;
     let mut metrics = BTreeMap::new();
+    let mut targets = BTreeSet::new();
+    let mut measured = BTreeSet::new();
 
     for line in text.lines().map(str::trim) {
         if line.starts_with("Running ") || line.starts_with("Running\t") {
             // A different Cargo target must not inherit the preceding bench's
             // identity if its header is unrecognized (for example a unit test).
             name = bench_name.captures(line).map(|c| c[1].to_owned());
+            if let Some(target) = &name {
+                targets.insert(target.clone());
+            }
         }
 
         if let Some(c) = pattern.captures(line) {
@@ -135,12 +140,24 @@ fn bench_metrics(text: &str) -> Result<BTreeMap<String, f64>, String> {
                 .ok_or("benchmark metric has no target identity")?;
             let key = format!("{name}/{}", c[1].trim());
             let value = c[2].parse::<f64>().map_err(|e| e.to_string())?;
+            if !value.is_finite() {
+                return Err(format!("non-finite benchmark metric {key}"));
+            }
+            measured.insert(name.clone());
             if metrics.insert(key.clone(), value).is_some() {
                 return Err(format!("duplicate benchmark metric {key}"));
             }
+        } else if name.is_some()
+            && line
+                .split_whitespace()
+                .any(|word| word.starts_with("ms/") || matches!(word, "ms" | "ms,"))
+        {
+            return Err(format!("unrecognized timing line: {line}"));
         }
     }
-
+    if let Some(missing) = targets.difference(&measured).next() {
+        return Err(format!("benchmark {missing} emitted no timing metrics"));
+    }
     Ok(metrics)
 }
 
@@ -187,6 +204,8 @@ fn bench(config: &Config, args: &Args, output: &Path) -> Result<Value, String> {
         if pass > 0 {
             let measured =
                 bench_metrics(&text).map_err(|error| format!("{error}; {}", path.display()))?;
+            validate_bench_inventory(&measured, &cargo_args)
+                .map_err(|error| format!("{error}; {}", path.display()))?;
 
             eprintln!("benchmark pass {pass}/{repeat}: {} metrics", measured.len());
             for (key, value) in measured {
@@ -228,25 +247,96 @@ fn bench(config: &Config, args: &Args, output: &Path) -> Result<Value, String> {
     Ok(result)
 }
 
-fn build_server(config: &Config) -> Result<PathBuf, String> {
-    process::cargo(
-        &config.root,
-        &[
-            "build",
-            "--locked",
-            "--release",
-            "-p",
-            "pdc",
-            "--bin",
-            "paradoxcode",
-        ],
-    )?;
-
-    Ok(config.root.join("target/release").join(if cfg!(windows) {
-        "paradoxcode.exe"
-    } else {
-        "paradoxcode"
-    }))
+/// Required series for the owned benchmark targets. A renamed or dropped measurement must be
+/// an explicit inventory change even when it is missing from every repetition.
+fn validate_bench_inventory(
+    metrics: &BTreeMap<String, f64>,
+    args: &[String],
+) -> Result<(), String> {
+    let required: &[(&str, &[&str])] = &[
+        (
+            "index_cache",
+            &[
+                "scan fixture",
+                "build cache",
+                "save cache",
+                "load cache",
+                "install cache",
+                "dense scan fixture",
+                "dense build cache",
+                "dense save cache",
+                "dense load cache",
+                "dense install cache",
+                "mixed scan Project",
+                "mixed load Vanilla cache",
+                "mixed install cache",
+            ],
+        ),
+        (
+            "synthetic_workspace",
+            &[
+                "initial scan/index",
+                "unchanged full refresh",
+                "one disk-file refresh",
+                "one overlay edit",
+            ],
+        ),
+        (
+            "interactive_queries",
+            &[
+                "diagnostics first",
+                "diagnostics repeat",
+                "hover first",
+                "hover repeat",
+                "completion first",
+                "completion repeat",
+            ],
+        ),
+        (
+            "mission_preview",
+            &["cold (first) pass", "warm (repeat) pass"],
+        ),
+        (
+            "quoted_queries",
+            &[
+                "empty-prefix script completion (0 unrelated events)",
+                "empty-prefix script completion (2000 unrelated events)",
+                "script completion (250 statements inside argument)",
+                "script completion (2000 statements inside argument)",
+                "quoted diagnostics (250 inner properties)",
+                "quoted completion (250 inner properties)",
+            ],
+        ),
+        (
+            "scripted_localisation",
+            &[
+                "registry first",
+                "registry repeat",
+                "localisation diagnostics",
+                "localisation completion (intentional empty)",
+            ],
+        ),
+    ];
+    let full = args.iter().any(|arg| arg == "--workspace")
+        && args.iter().any(|arg| arg == "--benches")
+        && !args
+            .iter()
+            .any(|arg| arg == "--exclude" || arg.starts_with("--exclude="));
+    for &(target, labels) in required {
+        let prefix = format!("{target}/");
+        let selected = full
+            || metrics.keys().any(|key| key.starts_with(&prefix))
+            || args.windows(2).any(|w| w[0] == "--bench" && w[1] == target);
+        if selected {
+            for label in labels {
+                let key = format!("{target}/{label}");
+                if !metrics.contains_key(&key) {
+                    return Err(format!("missing benchmark metric {key}"));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn sweep(
@@ -298,7 +388,7 @@ fn sweep(
         if args.get("--server").is_some() {
             process::server(&config.root, args.get("--server"))
         } else {
-            build_server(config)
+            process::build_server(&config.root, true)
         }
     })?;
 
@@ -464,12 +554,16 @@ fn ab(config: &Config, args: &Args) -> Result<String, String> {
         if old["inputs"]["source"] != new["inputs"]["source"] {
             return Err("baseline/candidate corpus roots differ".into());
         }
+        if old["cache_protocol"] != new["cache_protocol"] {
+            return Err("baseline/candidate cache protocols differ; use the same fresh or existing-cache protocol".into());
+        }
 
         workload = json!({
         "before":old["diagnostics_fingerprint"],"after":new["diagnostics_fingerprint"],"identical_diagnostics":old["diagnostics_fingerprint"]==new["diagnostics_fingerprint"]}
         );
 
         for key in [
+            "cache_build_ms",
             "scan_ms",
             "session_boot_ms",
             "classify_ms",
@@ -801,7 +895,7 @@ return Err("baseline already exists; use --force to replace".into());
 fs::remove_dir_all(&output).map_err(|e|e.to_string())?;
 }
 fs::create_dir_all(&output).map_err(|e|e.to_string())?;
-let binary=build_server(&config)?;
+let binary=process::build_server(&config.root,true)?;
 let frozen=output.join(binary.file_name().ok_or("invalid binary")?);
 fs::copy(&binary,&frozen).map_err(|e|e.to_string())?;
 report::write(&output.join("metadata.json"),&json!({
@@ -876,6 +970,21 @@ Ok(output.display().to_string())}
 #[cfg(test)]
 mod tests {
     use super::bench_metrics;
+    #[test]
+    fn partial_owned_inventory_fails_even_if_all_repetitions_are_identical() {
+        let metrics = bench_metrics(
+            "Running benches/interactive_queries.rs (target/bench)\nhover first: 1 ms\n",
+        )
+        .unwrap();
+        assert!(super::validate_bench_inventory(&metrics, &[]).is_err());
+        assert!(
+            super::validate_bench_inventory(
+                &Default::default(),
+                &["--bench".into(), "quoted_queries".into()]
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn benchmark_metrics_accept_plain_and_colored_cargo_output() {
@@ -931,6 +1040,7 @@ mod tests {
 
     #[test]
     fn benchmark_metrics_do_not_invent_measurements() {
-        assert!(bench_metrics("Finished `bench` profile\nRunning benches/fixture.rs (target/release/deps/fixture-123)\n").unwrap().is_empty());
+        assert!(bench_metrics("Finished `bench` profile\nRunning benches/fixture.rs (target/release/deps/fixture-123)\n").is_err());
+        assert!(bench_metrics("Running benches/fixture.rs (target/fixture)\nok: 1 ms\nhover: cold 3 ms, warm 0.3 ms/query\n").is_err());
     }
 }

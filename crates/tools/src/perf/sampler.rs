@@ -1,29 +1,24 @@
 //! Periodic child CPU/RSS observations; missing samples remain explicit.
+#[cfg(target_os = "linux")]
+mod linux;
+#[cfg(windows)]
+mod windows;
+#[cfg(not(any(windows, target_os = "linux")))]
 use crate::process;
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
+#[cfg(windows)]
 pub fn sample(pid: u32) -> Result<Value, String> {
-    if cfg!(windows) {
-        let script = format!(
-            "$p = Get-Process -Id {pid} -ErrorAction Stop; Write-Output ($p.CPU.ToString([Globalization.CultureInfo]::InvariantCulture) + ' ' + $p.WorkingSet64)"
-        );
-        let output = process::capture(process::command("powershell").args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            &script,
-        ]))?;
-        let text = String::from_utf8_lossy(&output.stdout);
-        let parts = text.split_whitespace().collect::<Vec<_>>();
-        if parts.len() != 2 {
-            return Err("invalid Windows process sample".into());
-        }
-        return Ok(
-            json!({"cpu_seconds":parts[0].parse::<f64>().map_err(|e|e.to_string())?,"working_set_bytes":parts[1].parse::<u64>().map_err(|e|e.to_string())?}),
-        );
-    }
+    windows::Observer::new(pid)?.sample()
+}
+#[cfg(target_os = "linux")]
+pub fn sample(pid: u32) -> Result<Value, String> {
+    linux::sample(pid)
+}
+#[cfg(not(any(windows, target_os = "linux")))]
+pub fn sample(pid: u32) -> Result<Value, String> {
     let output = process::capture(process::command("ps").args([
         "-o",
         "time=,rss=",
@@ -39,6 +34,7 @@ pub fn sample(pid: u32) -> Result<Value, String> {
         json!({"cpu_seconds":cpu_time(parts[0])?,"working_set_bytes":parts[1].parse::<u64>().map_err(|e|e.to_string())?*1024}),
     )
 }
+#[cfg(any(test, not(any(windows, target_os = "linux"))))]
 fn cpu_time(text: &str) -> Result<f64, String> {
     let (days, time) = text
         .split_once('-')
@@ -68,8 +64,17 @@ impl Sampler {
         let (stop, rx) = mpsc::channel();
         let thread = std::thread::spawn(move || {
             let started = Instant::now();
+            #[cfg(windows)]
+            let mut observer = windows::Observer::new(pid);
             loop {
-                match sample(pid) {
+                #[cfg(windows)]
+                let observation = observer
+                    .as_mut()
+                    .map_err(|e| e.clone())
+                    .and_then(|o| o.sample());
+                #[cfg(not(windows))]
+                let observation = sample(pid);
+                match observation {
                     Ok(mut sample) => {
                         sample["elapsed_ms"] = json!(started.elapsed().as_secs_f64() * 1000.0);
                         let mut data = captured.lock().unwrap();
@@ -91,7 +96,7 @@ impl Sampler {
                         }
                     }
                 }
-                if rx.recv_timeout(interval).is_ok() {
+                if rx.recv_timeout(interval) != Err(mpsc::RecvTimeoutError::Timeout) {
                     break;
                 }
             }

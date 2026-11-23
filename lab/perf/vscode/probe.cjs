@@ -21,6 +21,7 @@ exports.run = async function () {
   const digest = value => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
   const start = performance.now();
   const report = { status: 'running', vscode: vscode.version, platform: process.platform,
+    readinessMeasurement: 'indexed-file-count-v2',
     server: process.env.PDC_PROBE_SERVER, serverSha256: crypto.createHash('sha256').update(fs.readFileSync(process.env.PDC_PROBE_SERVER)).digest('hex'),
     configuration: config, samples: [], requests: [], requestStarts: [], decisions: [], resultDigests: [], sourceSha256: {} };
   const save = () => {
@@ -70,17 +71,17 @@ exports.run = async function () {
       report.decisions.push({ atMs: performance.now() - start, ...params });
     });
     await client.sendNotification('$/setTrace', { value: 'verbose' });
-    await measured('workspace.ready-and-summary', () => client.sendRequest('pdc/workspaceSummary')
-      .then(summary => { report.workspaceSummary = summary; return summary; }));
-    // A server may answer workspaceSummary while its initial index workers are running.
-    for (let i = 0; i < 120; i++) {
-      const summary = await client.sendRequest('pdc/workspaceSummary');
-      report.workspaceSummary = summary;
-      if ((summary.fileCounts?.total ?? 0) >= (config.expectedIndexedFiles ?? 10000)) break;
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-    if (config.expectedIndexedFiles && report.workspaceSummary.fileCounts.total !== config.expectedIndexedFiles)
-      throw new Error(`Indexed files differ: expected ${config.expectedIndexedFiles}, got ${report.workspaceSummary.fileCounts.total}`);
+    await measured('workspace.ready-and-summary', async () => {
+      const expected = config.expectedIndexedFiles ?? 10000;
+      for (let i = 0; i < 120; i++) {
+        const summary = await client.sendRequest('pdc/workspaceSummary');
+        report.workspaceSummary = summary;
+        const files = summary.fileCounts?.total;
+        if (config.expectedIndexedFiles === undefined ? files >= expected : files === expected) return summary;
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      throw new Error(`Workspace readiness timed out: expected ${expected} files, got ${report.workspaceSummary?.fileCounts?.total}`);
+    });
     save();
     const originalRequest = client.sendRequest.bind(client);
     client.sendRequest = function (...args) {

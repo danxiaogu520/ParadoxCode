@@ -4,7 +4,17 @@ on:
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
-  # Explicit benchmark validation without adding heavy work to ordinary PRs.
+    inputs:
+      baseline_ref:
+        description: Baseline commit or tag (defaults to the nearest release tag)
+        required: false
+        type: string
+      enforce:
+        description: Fail on a confirmed paired latency regression
+        default: false
+        type: boolean
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
   push:
     branches: ['ci/perf-validation/**']
 
@@ -16,22 +26,94 @@ env:
 
 jobs:
   benchmarks:
-    name: Rust benchmarks (Linux)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    if: github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'perf-validation') && (github.event.action != 'labeled' || github.event.label.name == 'perf-validation'))
+    name: Performance (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            exe: ''
+          - os: windows-latest
+            exe: '.exe'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           key: perf-stable
+      - name: Build optimized server and measurement tools
+        run: |
+          cargo build --locked --release -p tools
+          cargo build --locked --release -p pdc --bin paradoxcode
+        shell: bash
+      - name: Freeze reference server on the same runner
+        shell: bash
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || inputs.baseline_ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$BASE_REF" && "$GITHUB_EVENT_NAME" == push ]]; then
+            BASE_REF=$(git merge-base HEAD "origin/$DEFAULT_BRANCH")
+          fi
+          if [[ -z "$BASE_REF" ]]; then
+            BASE_REF=$(git describe --tags --match 'v[0-9]*' --abbrev=0 HEAD)
+          fi
+          base=$(git rev-parse --verify --end-of-options "$BASE_REF^{commit}")
+          git worktree add --detach "$RUNNER_TEMP/perf-reference" "$base"
+          cargo build --manifest-path "$RUNNER_TEMP/perf-reference/Cargo.toml" --target-dir "$RUNNER_TEMP/perf-reference-target" --locked --release -p pdc --bin paradoxcode
+          mkdir -p target/performance-results
+          git rev-parse HEAD > target/performance-results/candidate-commit.txt
+          echo "$base" > target/performance-results/baseline-commit.txt
+          rustc --version --verbose > target/performance-results/rustc.txt
+      - name: Measure alternating baseline and candidate sessions
+        id: paired
+        shell: bash
+        env:
+          ENFORCE: ${{ github.event_name == 'pull_request' || inputs.enforce || false }}
+        run: |
+          set -euo pipefail
+          flags=()
+          if [[ "$ENFORCE" == true ]]; then flags+=(--enforce); fi
+          ./target/release/tools${{ matrix.exe }} perf pair \
+            --before "$RUNNER_TEMP/perf-reference-target/release/paradoxcode${{ matrix.exe }}" \
+            --after target/release/paradoxcode${{ matrix.exe }} --pairs 4 --samples 3 \
+            --files 96 --document-entries 256 --edit-rounds 20 "${flags[@]}"
+      - name: Measure repeated edit and close cycles
+        if: ${{ !cancelled() && (steps.paired.outcome == 'success' || steps.paired.outcome == 'failure') }}
+        shell: bash
+        run: |
+          ./target/release/tools${{ matrix.exe }} perf suite --server target/release/paradoxcode${{ matrix.exe }} \
+            --sessions 1 --samples 1 --files 128 --document-entries 400 \
+            --edit-rounds 3 --soak-cycles 100 --output target/performance-results/soak.json
+      - name: Measure large-file editing
+        if: ${{ !cancelled() && (steps.paired.outcome == 'success' || steps.paired.outcome == 'failure') }}
+        shell: bash
+        run: |
+          ./target/release/tools${{ matrix.exe }} perf suite --server target/release/paradoxcode${{ matrix.exe }} \
+            --sessions 1 --samples 1 --files 128 --document-entries 2000 \
+            --edit-rounds 6 --output target/performance-results/large-files.json
+      - name: Summarize performance evidence
+        if: always() && hashFiles('target/performance-results/pair.json') != ''
+        shell: bash
+        run: python lab/perf/ci_summary.py target/performance-results >> "$GITHUB_STEP_SUMMARY"
       - name: Run optimized benchmark suite
-        run: cargo run --locked -p tools -- perf bench --repeat 3
+        if: ${{ !cancelled() && runner.os == 'Linux' && (steps.paired.outcome == 'success' || steps.paired.outcome == 'failure') }}
+        run: target/release/tools perf bench --repeat 3
       - name: Preserve benchmark reports and raw logs
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: benchmark-results-${{ github.run_id }}-${{ github.run_attempt }}
-          path: target/perf/runs/
+          name: benchmark-results-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            target/perf/runs/
+            target/performance-results/
           if-no-files-found: warn
           retention-days: 14

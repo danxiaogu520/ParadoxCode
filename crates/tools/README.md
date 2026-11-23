@@ -26,6 +26,7 @@ Without it, real-server tests build the current debug binary before running.
 | `audit templates` | [audit/templates](src/audit/templates/mod.rs) | Owned text/call/finite-domain references and frozen real-LSP editing observations |
 | `perf bench / baseline / ab / profile` | [perf/workflow.rs](src/perf/workflow.rs) | Warmup, repetitions, frozen binaries, comparisons and external profilers |
 | `perf probe / compare` | [perf/client.rs](src/perf/client.rs) | Actual LSP initialization, readiness, open/edit publication and interactive queries |
+| `perf suite / pair` | [perf/suite](src/perf/suite/mod.rs) | Repeatable stdio workloads, closed-overlay cycles, alternating same-host comparisons and regression thresholds |
 | `perf memory` | [perf/memory.rs](src/perf/memory.rs) | Sequential measured-child peak RSS, phase RSS and diagnostic signatures |
 | `perf init / status / import-corpus / control` | [perf/workflow.rs](src/perf/workflow.rs) | Environment checks, owned local inputs and native comparison workflows |
 | `editor check / compile / test / package` | [editor.rs](src/editor.rs) | Static contracts, translations, TypeScript compilation, behavior tests and VSIX packaging |
@@ -164,6 +165,101 @@ when comparing revisions. Failed runs cannot leave the prior baseline marked suc
 
 ## Performance measurements
 
+Start with `cargo run --release --locked -p tools -- perf suite`. It builds an optimized server or
+accepts a frozen executable with `--server`. Each independent session creates a private profile,
+project, live editor overlays and an indexed dependency. One process builds the missing dependency
+index, then a new process restarts with the same cache. Fixture generation and compilation precede
+timing. `--files` controls dependency files and `--document-entries` controls events in the open
+document. `--cache` adds a private copy of an optional Vanilla index. The OS filesystem cache is shared.
+
+| Workload | Observations |
+| --- | --- |
+| Lifecycle and resources | Initialize, indexed readiness, first dependency lookup, shutdown, idle CPU, sampled peak working set and phase snapshots |
+| Editor requests | First and repeated completion, quoted parameters, completion resolve, hover, definition, references, prepare/execute rename, quick fixes, formatting, document/workspace symbols and semantic tokens |
+| Edit propagation | Versioned open and incremental/full-change diagnostics, changed-token delta reconstruction, configuration changes, save/close and disk symbol visibility |
+| Scheduling | Parallel hover/completion/tokens/symbols, rapid replacement with cancellation, latest result checked against a settled query, editing during reindex |
+| Cross-file edit trials | Reopen large callers at three positions, change a template parameter in another overlay, request diagnostics while typing, verify the new candidate and close both files |
+| Workspace work | Watched create/change/delete through observable symbol changes, explicit reindex, validate and format in the temporary project |
+| Game-specific requests | Rules, script symbols and uses, localisation, full-text and editor searches, result detail, previews, textures and protocol transcoding |
+
+```sh
+cargo run --release --locked -p tools -- perf suite --server /path/to/before --sessions 3 --samples 10 --output target/performance-results/before.json
+cargo run --release --locked -p tools -- perf suite --server /path/to/after --sessions 3 --samples 10 --baseline target/performance-results/before.json --fail-over 15 --min-delta-ms 2 --output target/performance-results/after.json
+cargo run --release --locked -p tools -- perf compare --compare target/performance-results/before.json target/performance-results/after.json
+```
+
+Suite reports carry the binary hash, fixture and cache hashes, workload settings, per-request
+samples in milliseconds, validated result counts, cancellation outcomes and process observations.
+Each method's first invocation runs in a fixed editor sequence and can benefit from earlier
+methods. `repeat` measures the same position at one revision. Nearest-rank P95 appears at 20
+samples and P99 at 100. One hundred requests in one process still represent one session.
+Comparison requires matching workloads and scenario counts. It uses P95 when available and
+the median otherwise. The optional gate requires both a relative regression and an absolute
+increase above the noise floor (1 ms by default). Run baseline and candidate on the same host
+and alternate order across pairs. Exceptions and timeouts produce a failed report with the
+completed measurements. A cancelled completion that finished before cancellation retains a
+missing post-cancel interval. Keep UI paint, full-response equivalence and real-mod replay
+as separate measurements using the editor harness and `perf completion` below.
+
+The report also computes mixed-burst requests per second and workspace validation/formatting
+throughput. Resource comparisons show the observed session count and only compute a difference
+when both sides have complete samples. With an external index, a workspace rename can be
+refused when template references are incomplete. That specific refusal has its own series.
+The local-parameter rename case must produce edits in both configurations.
+
+### Compare two server builds
+
+```sh
+cargo run --release --locked -p tools -- perf pair --before /path/to/baseline-server --after /path/to/candidate-server --pairs 4 --edit-rounds 20 --document-entries 256
+```
+
+`pair` uses the current measurement client for both executables. Each pair runs on the same
+host with fresh private fixtures for each arm. Pairs alternate A/B and B/A. The default
+`target/performance-results/pair.json` identifies the binaries, execution order and the
+sibling directory containing every raw suite report and per-pair comparison. A failed
+request or an incompatible workload fails the command and identifies the affected run.
+Earlier suite reports remain comparable with reports from the same workload version.
+
+The paired verdict covers five latency series spanning fresh and cached startup to ready,
+open to first completion, last edit to a verified completion, and a watched change until
+the new symbol is visible and the old symbol disappears. Each pair contributes one
+observation per binary per series. Open/last-edit use the within-session P95 at 20 or
+more edit rounds and the median below 20. Startup and the watched change each contribute
+one timing per process scenario. The report includes all paired deltas, their median,
+range and median absolute deviation. Reopening an overlay resets its edits and can reuse
+process caches. Each pair starts independent server processes.
+
+By default a slowdown is reported when **at least three quarters of the pairs** exceed
+both 20% and 5 ms on the same series. Set `--fail-over` and `--min-delta-ms` to change
+the limits. `--enforce` requires at least four pairs and returns failure on that verdict.
+Point both sides at the same server to measure the runner's variability.
+
+### Repeated open/edit/close workload
+
+```sh
+cargo run --release --locked -p tools -- perf suite --sessions 1 --samples 1 --document-entries 2000 --soak-cycles 100
+```
+
+`--edit-rounds` defaults to five. Every trial checks the disk parameter on open, the
+renamed parameter after the last keystroke, and removal of an overlay-only definition on
+close. `--soak-cycles` defaults to zero. When enabled it continues this workload in the
+same process. At the initial checkpoint and up to eight later checkpoints, the harness
+waits the configured idle interval after close and samples server CPU and working set.
+The trace includes completed cycles, cancellations, last-edit latencies by window and
+end-to-start working-set change. The running report is saved atomically at each checkpoint,
+outside the request timers. Retained allocator pages can contribute to working-set growth.
+
+The Performance workflow builds both binaries on each Windows and Linux runner. A PR
+with the `perf-validation` label compares its head with its base SHA and enables enforcement for
+the five selected series. A push to
+`ci/perf-validation/**` compares with its merge base against the default branch.
+Scheduled and manual runs use the nearest reachable release tag. Manual runs also accept
+a baseline ref and optional enforcement. Scheduled and validation-branch runs report timing
+regressions as advisory findings. CI publishes a summary and raw evidence. The 100-cycle
+test uses 400 extra event entries. A separate six-round run uses 2,000 entries to measure
+large-file costs. Both dimensions are configurable for local stress runs. The Rust
+microbenchmarks run on Linux.
+
 ```sh
 cargo run --locked -p tools -- perf bench --repeat 3 -- -p engine --bench index_cache --locked
 cargo run --locked -p tools -- perf probe --no-cache
@@ -199,6 +295,12 @@ Optional diagnostic publication waits are bounded by `--publication-timeout-ms` 
 missing publications are recorded. A reindex made obsolete by an edit is recorded explicitly.
 The report includes source/binary hashes, source-root inventory and initialization options.
 
+For installed dependencies, pass `--dependency ID=/path/to/mod` to `probe`, `compare` or
+`completion`. Add `--dependency-index ID=/path/to/mod.pdcindex` to replay its indexed startup
+path. Both flags may be repeated. Source order is preserved and the server gets a private copy
+of each dependency database because startup may refresh it. Reports record the original path
+and input hash. Each typing phase also exposes its last edit and cancellation counts.
+
 `tools lsp test` includes an owned Unicode/CRLF completion replay with overlapping edits and
 reindexing. `tools editor test host --server /path/to/paradoxcode` exercises 30 actual VS Code
 completion-provider requests after edits and writes `target/performance-results/editor-completion-host.json`.
@@ -210,10 +312,11 @@ LSP round trip; suggest-widget painting and native Windows execution require sep
 Existing user caches are retained. Compare runs with the same cache protocol, inputs, binary
 build mode and filesystem state.
 
-Memory pairs use the Unix platform `time` utility's measured-child `wait4` peak and `ps` for
-that child's phase RSS. Sampler processes are excluded from that peak. Periodic LSP RSS in
-probe/compare/sweep is a separate sampled measurement. Windows supports the periodic process
-sampler; exact memory pairs require Unix. Profiling requires `samply` or Linux `perf`.
+Memory pairs alternate execution order and use the Unix platform `time` utility's measured-child
+`wait4` peak. Phase RSS comes from the child's `/proc` record on Linux and `ps` on macOS.
+Periodic LSP RSS in probe/compare/sweep/suite is a separate sampled measurement. Windows reuses
+one observer for periodic process sampling. Exact memory pairs require Unix. Profiling requires
+`samply` or Linux `perf`.
 
 Machine settings belong in ignored `target/perf/config.local.toml`, for example:
 

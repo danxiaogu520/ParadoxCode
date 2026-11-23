@@ -45,6 +45,7 @@ pub fn execute(arguments: &[String]) -> Result<String, String> {
             "--timeout-ms",
             "--publication-timeout-ms",
             "--dependency",
+            "--dependency-index",
         ],
         &["--reindex", "--full-text"],
     )?;
@@ -91,13 +92,11 @@ fn run(args: &Args, root: &Path, output: &Path) -> Result<String, String> {
         options["gameDirectory"] = json!(fs::canonicalize(path).map_err(|e| e.to_string())?);
         options["vanillaMode"] = json!("auto");
     }
-    if let Some(dependencies) = args.values.get("--dependency") {
-        options["dependencies"] =
-            json!(dependencies.iter().map(|value| {
-            let (id, path) = value.split_once('=').ok_or("--dependency needs ID=PATH")?;
-            Ok(json!({"id":id,"path":fs::canonicalize(path).map_err(|e| e.to_string())?}))
-        }).collect::<Result<Vec<Value>,String>>()?);
-    }
+    let dependencies = super::dependencies::Dependencies::new(
+        args,
+        &std::env::current_dir().map_err(|e| e.to_string())?,
+    )?;
+    options["dependencies"] = json!(dependencies.options);
     let mut client = Client::spawn(&binary, &workspace, timeout)?;
     let started = Instant::now();
     let initialized = client
@@ -314,7 +313,7 @@ fn run(args: &Args, root: &Path, output: &Path) -> Result<String, String> {
                     }
                 }
             }
-            phases.push(json!({"reindex":reindex,"reindex_obsolete_result":reindex_error,"requests_before_reindex_response":overlap,"latest_matches_settled":latest_matches,"latest_diagnostics_observed":publication,"summary":summarize(&records),"samples":records}));
+            phases.push(json!({"reindex":reindex,"reindex_obsolete_result":reindex_error,"requests_before_reindex_response":overlap,"latest_matches_settled":latest_matches,"latest_diagnostics_observed":publication,"last_edit":records.last(),"summary":summarize(&records),"samples":records}));
         }
         client.close(&path)?;
         eprintln!("completion replay: {}", case.path);
@@ -325,7 +324,8 @@ fn run(args: &Args, root: &Path, output: &Path) -> Result<String, String> {
         )?;
     }
     client.shutdown()?;
-    let result = json!({"status":if failures.is_empty(){"passed"}else{"failed"},"failures":failures,"binary_sha256":report::file_hash(&binary)?,"initialize":initialized,"workspace_inventory":workspace_inventory,"initialization_ms":initialization_ms,"options":options,"edit_sync":if args.flag("--full-text"){"full"}else{"incremental"},"samples_per_phase":samples,"interval_ms":interval.as_millis(),"runs":runs,"limits":"Local stdio latency, not editor rendering. Nearest-rank percentiles; canceled responses and empty results are reported separately. Small sample P99 is the sample maximum."});
+    let mut result = json!({"status":if failures.is_empty(){"passed"}else{"failed"},"failures":failures,"binary_sha256":report::file_hash(&binary)?,"initialize":initialized,"workspace_inventory":workspace_inventory,"initialization_ms":initialization_ms,"options":options,"edit_sync":if args.flag("--full-text"){"full"}else{"incremental"},"samples_per_phase":samples,"interval_ms":interval.as_millis(),"runs":runs,"limits":"Local stdio latency, not editor rendering. Nearest-rank percentiles; canceled responses and empty results are reported separately. Small sample P99 is the sample maximum."});
+    result["dependency_inputs"] = json!(dependencies.inventory);
     report::write(output, &result)?;
     if result["status"] != "passed" {
         return Err(format!("completion replay failed; {}", output.display()));
@@ -380,7 +380,7 @@ fn percentile(values: &[f64], percent: usize) -> Option<f64> {
         .get((sorted.len() * percent).div_ceil(100).saturating_sub(1))
         .copied()
 }
-fn normalize(mut value: Value) -> Value {
+pub(super) fn normalize(mut value: Value) -> Value {
     if let Some(items) = value["items"].as_array_mut() {
         for item in items {
             if let Some(template) = item

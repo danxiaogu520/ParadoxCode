@@ -56,11 +56,11 @@ fn main() {
     });
 
     println!(
-        "quoted diagnostics: {:.3} ms/query (250 inner properties)",
+        "quoted diagnostics (250 inner properties): {:.6} ms",
         diagnostics_elapsed.as_secs_f64() * 1_000.0 / 50.0
     );
     println!(
-        "quoted completion: {:.3} ms/query (250 inner properties)",
+        "quoted completion (250 inner properties): {:.6} ms",
         completion_elapsed.as_secs_f64() * 1_000.0 / 200.0
     );
 }

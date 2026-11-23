@@ -91,6 +91,9 @@ The available groups and their commands are implemented in
 shows the CLI. Rust behavior normally calls for `core-fast`, extension work for `vscode`,
 repository/docs changes for `policy`, embedded/distribution changes for `artifact`, and
 fuzz changes for `fuzz`. Performance-sensitive work also runs a targeted benchmark or `perf`.
+The `perf-validation` PR label requests a same-runner comparison against the PR base on Windows
+and Linux and enables the five latency checks for that PR. The Performance job summary identifies recurrent slowdowns and links them to the
+measured commits. Pair and long-session reports are included in the workflow artifacts.
 The default local run includes deterministic groups; optimized `perf` remains opt-in.
 
 Before committing, run formatting and focused checks. Before opening/updating a PR, run affected

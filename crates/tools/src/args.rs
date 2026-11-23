@@ -41,7 +41,7 @@ impl Args {
             i += 1;
         }
         for (key, list) in &result.values {
-            if list.len() > 1 && key != "--dependency" {
+            if list.len() > 1 && !matches!(key.as_str(), "--dependency" | "--dependency-index") {
                 return Err(format!("duplicate option: {key}"));
             }
         }

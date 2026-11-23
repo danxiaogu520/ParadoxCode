@@ -3,7 +3,7 @@
 //! The fixture deliberately contains many ordinary script definitions and only a small
 //! scripted-localisation subtree.  The cold query therefore makes the path-partitioning
 //! optimization visible, while the warm query exercises the snapshot cache used by editor
-//! diagnostics and completion.
+//! diagnostics. Completion in localisation prose exercises the intentional empty-result path.
 
 use std::hint::black_box;
 use std::time::{Duration, Instant};
@@ -77,6 +77,10 @@ fn main() {
         black_box(scripted_localisation_names(&host.snapshot()));
     });
     let snapshot = host.snapshot();
+    assert_eq!(
+        scripted_localisation_names(&snapshot).len(),
+        SCRIPTED_FILES * NAMES_PER_FILE
+    );
     let names_warm = measured(20, || {
         black_box(scripted_localisation_names(&snapshot));
     });
@@ -99,6 +103,11 @@ fn main() {
     let completion_elapsed = measured(20, || {
         black_box(complete(&snapshot, &document, completion_position));
     });
+    assert!(
+        complete(&snapshot, &document, completion_position)
+            .items
+            .is_empty()
+    );
 
     println!(
         "scripted localisation: {} names across {} files + {} ordinary files ({} indexed files)",
@@ -108,12 +117,12 @@ fn main() {
         scan.indexed_files
     );
     println!(
-        "registry: cold {:.3} ms, warm {:.3} ms/query",
+        "registry first: {:.6} ms\nregistry repeat: {:.6} ms",
         names_cold.as_secs_f64() * 1_000.0,
         names_warm.as_secs_f64() * 1_000.0 / 20.0
     );
     println!(
-        "localisation diagnostics: {:.3} ms, completion: {:.3} ms/query",
+        "localisation diagnostics: {:.6} ms\nlocalisation completion (intentional empty): {:.6} ms",
         diagnostics_elapsed.as_secs_f64() * 1_000.0,
         completion_elapsed.as_secs_f64() * 1_000.0 / 20.0
     );

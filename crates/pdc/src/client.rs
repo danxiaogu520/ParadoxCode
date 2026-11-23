@@ -86,13 +86,22 @@ pub struct Client {
 }
 impl Client {
     pub fn spawn(binary: &Path, workspace: &Path, timeout: Duration) -> Result<Self, String> {
-        let mut child = Command::new(binary)
+        Self::spawn_command(Command::new(binary), workspace, timeout)
+    }
+
+    /// Starts a measured server with caller-selected child environment and the standard transport.
+    pub fn spawn_command(
+        mut command: Command,
+        workspace: &Path,
+        timeout: Duration,
+    ) -> Result<Self, String> {
+        let mut child = command
             .current_dir(workspace)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|e| format!("server {}: {e}", binary.display()))?;
+            .map_err(|e| format!("server {:?}: {e}", command.get_program()))?;
         let input = child.stdin.take();
         let stdout = child.stdout.take().ok_or("missing server stdout")?;
         let stderr = Arc::new(Mutex::new(String::new()));
